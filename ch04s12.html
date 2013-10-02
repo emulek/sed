@@ -1,0 +1,161 @@
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"><title>Переименование файлов.</title><link rel="stylesheet" href="chs/default.css" type="text/css"><meta name="generator" content="DocBook XSL Stylesheets V1.75.1"><link rel="home" href="index.html" title="Краткий учебник по sed."><link rel="up" href="ch04.html" title="Глава 4. Примеры скриптов."><link rel="prev" href="ch04s11.html" title="Вырезание комментария в bash скрипте."><link rel="next" href="ch04s13.html" title="Парсинг конфигов."></head><body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF"><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">Переименование файлов.</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="ch04s11.html">Пред.</a> </td><th width="60%" align="center">Глава 4. Примеры скриптов.</th><td width="20%" align="right"> <a accesskey="n" href="ch04s13.html">След.</a></td></tr></table><hr></div><div class="section" title="Переименование файлов."><div class="titlepage"><div><div><h3 class="title"><a name="id2523704"></a>Переименование файлов.</h3></div></div></div><div class="section" title="Переименование файлов в их порядковый номер."><div class="titlepage"><div><div><h4 class="title"><a name="id2523709"></a>Переименование файлов в их порядковый номер.</h4></div></div></div><div class="note" title="Замечание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Замечание</h3>
+				Так-же переименование рассмотрено <a class="link" href="ch07.html#info_ren">в примере к info sed</a>.
+			</div><p>
+				Часто файлы после неправильного монтирования или после распаковки с неправильной кодировкой получаются с битыми именами, к примеру вот как выглядит альбом "Зачем снятся сны" Гражданской Обороны, если его записать на флешку в системе с UTF-8, а прочитать в системе с KOI8-R:
+				<a name="pic2_1"></a>
+				</p><div class="figure"><a name="id2523743"></a><p class="title"><b>Рисунок 4.9. Каталог с битыми именами</b></p><div class="figure-contents"><div><img src="img/snapshot1.png" alt="Каталог с битыми именами"></div></div></div><p><br class="figure-break">
+			</p><p>
+				Если посмотреть этот вывод командой <span class="command"><strong>hexdump</strong></span>, становится видно, что имена побились безвозвратно - знаки вопроса (?) действительно имеют код <span class="quote">&#171;<span class="quote">\x3F</span>&#187;</span>, и потому то, что было на их месте не подлежит восстановлению.
+				</p><div class="note" title="Замечание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Замечание</h3>
+					Если бы это было не так, мы могли-бы сконвертировать имя командой <span class="command"><strong>iconv</strong></span>, и вернуть первоначальное имя. См. ниже <a class="link" href="ch04s14.html#ren_iconv">пример</a>.
+				</div><p>
+				Попробуем переименовать файлы из XXX.mp3,  в NN.mp3, где XXX - любые символы, а NN - это номер файла.  Для начала, создадим список из имён файлов с номером строки:
+				</p><div class="figure"><a name="id2523805"></a><p class="title"><b>Рисунок 4.10. Получение списка файлов с их номером</b></p><div class="figure-contents"><div><img src="img/snapshot2.png" alt="Получение списка файлов с их номером"></div></div></div><p><br class="figure-break">
+				</p><div class="important" title="Важно" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Важно</h3>
+					Здесь я использую <span class="command"><strong>/bin/ls</strong></span>, для того, что-бы не сработал никакой алиас.  Обычно <span class="command"><strong>ls</strong></span> выводит список файлов вместе со всякими добавочными символами, к примеру добавляет `*' к каждому исполняемому файлу.  Применение полного пути приведёт к тому, что выполнится именно исполняемый файл /bin/ls, а не алиас.  Кроме того, /bin/ls выводит цветной список в несколько колонок, но так-как мы выводим в поток, вывод происходит в одну колонку и без раскраски.  На <a class="link" href="ch04s12.html#pic2_1">рисунке</a> хорошо видно, что просто <span class="command"><strong>ls</strong></span> выдаёт нам совсем не то что требуется.
+				</div><p>
+				Далее используем следующий скрипт:
+				</p><pre class="screen">$ /bin/ls | sed = |\
+sed -rn 'N;s/[a-z0-9_.]*$/\n&amp;/i;s/^([0-9]+)\n([^\n]+)\n(.*)/mv -v "\2\3" "\1\3"/ep'</pre><p>
+				Здесь обработка имени происходит в несколько этапов:
+			</p><p>
+				Во первых мы объединяем имя файла и его номер командой <span class="command"><strong>N</strong></span>.
+			</p><p>
+				Затем мы отделяем расширение файла.  Расширение файла нам пригодится для того что-бы эти файлы не путать, кроме того, обычно расширением является последовательность вполне допустимых символов, которые можно и нужно сохранить. Я считаю допустимыми символы [a-z0-9_.].
+				</p><pre class="programlisting">s/[a-z0-9_.]*$/\n&amp;/i</pre><p>
+				</p><div class="note" title="Замечание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Замечание</h3>
+					Тут возможно 2 особых случая:
+					<div class="orderedlist"><ol class="orderedlist" type="1"><li class="listitem">Расширения может и не быть, в этом случае команда <span class="command"><strong>s</strong></span> всё равно выполнится и добавит в конец буфера перевод строки.</li><li class="listitem">Всё имя файла может состоять из допустимых символов.  В таком случае следующая команда <span class="command"><strong>s</strong></span> просто не выполнится, и с файлом не произойдёт никаких изменений.</li></ol></div></div><p>
+				Обратите внимание на модификатор <code class="option">i</code>, он нужен для того, что-бы малые и большие буквы не различались.  Часто многие девайсы называют файлы большими буквами (руки бы оторвать кодерам этих девайсов...).
+			</p><p>
+				После отделения расширения происходит собственно переименование командой <span class="command"><strong>mv</strong></span>:
+				</p><pre class="programlisting">s/^([0-9]+)\n([^\n]+)\n(.*)/mv -v "\2\3" "\1\3"/ep</pre><p>
+				Обратите внимание на модификатор <code class="option">+</code> во втором выражении, он нужен для того, что-бы <span class="command"><strong>mv</strong></span> не пыталась переименовывать файлы с допустимыми именами. Команда <span class="command"><strong>mv</strong></span> выполняется с ключом <code class="option">-v</code> и модификатором <code class="option">ep</code>, для того, что-бы мы видели какие файлы переименовываются.
+				</p><div class="figure"><a name="id2524007"></a><p class="title"><b>Рисунок 4.11. Результат работы скрипта</b></p><div class="figure-contents"><div><img src="img/snapshot3.png" alt="Результат работы скрипта"></div></div></div><p><br class="figure-break">
+			</p><p>
+				</p><div class="note" title="Замечание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Замечание</h3>
+					На самом деле тут совсем не всё так просто: вместо непонятных символов ОС подставляет знаки вопроса, а эти знаки потом переходят в команду <span class="command"><strong>mv</strong></span> и она их обрабатывает как "любой одиночный символ".  Бывает так, что этот подход не помогает, например если в имени есть кавычки и/или переводы строки.  В этом случае нам поможет команда <span class="command"><strong>find</strong></span>, с опцией <code class="option">-printf</code>.
+				</div><p>
+			</p></div><div class="section" title="Переименование файлов по номеру inode."><div class="titlepage"><div><div><h4 class="title"><a name="id2524056"></a>Переименование файлов по номеру inode.</h4></div></div></div><p>
+				Если имена файлов совсем не читаемые, мы их и читать не будем!  Смотрите:
+				</p><pre class="screen">$ find . -type f -printf "%h/%i\n"
+./1753457
+./1753458
+./1753463
+./1753461
+./1753464
+./1753468
+./1753453
+./1753470
+./1753465
+./1753462
+./1753467
+./1753450
+./1753456
+./1753452
+./1753469
+./1753455
+./1753454
+./1753451
+./1753459
+./1753460
+./1753466</pre><p>
+				Что это за хрень?  Всё просто: это каталог где лежит файл, а вместо его имени записан его inode.  Путь мне тоже нужен, т.к. <span class="command"><strong>find</strong></span> просматривает не только каталог, но и его подкаталоги.
+				</p><div class="tip" title="Подсказка" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Подсказка</h3>Если вам не нужен просмотр подкаталогов, используйте <span class="command"><strong>find</strong></span> с опцией <code class="option">-maxdepth 1</code></div><p>
+				А теперь делаем так-же как в прошлом скрипте, однако файлы ищем не по имени, а по их inode:
+				</p><div class="figure"><a name="id2524107"></a><p class="title"><b>Рисунок 4.12. Переименование файлов по inode</b></p><div class="figure-contents"><div><img src="img/snapshot4.png" alt="Переименование файлов по inode"></div></div></div><p><br class="figure-break">
+				</p><div class="note" title="Замечание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Замечание</h3>
+					На самом деле тут наверное всё-же происходит подстановка битого имени.  Внутри команды <span class="command"><strong>find</strong></span>.
+				</div><p>
+			</p><p>
+				</p><div class="note" title="Замечание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Замечание</h3>
+					Обратите внимание на двойное экранирование точки с запятой.  Для команды <span class="command"><strong>find</strong></span> необходимо одиночное экранирование, но в выражении для замены команды <span class="command"><strong>s</strong></span> приходится применять ещё одно экранирование.  Иначе ; будет без слеша.
+				</div><p>
+			</p></div><div class="section" title="Получение типа файла и создание расширения."><div class="titlepage"><div><div><h4 class="title"><a name="id2524160"></a>Получение типа файла и создание расширения.</h4></div></div></div><p>
+				</p><div class="note" title="Замечание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Замечание</h3>
+					Многие гуру Linux-а меня сейчас закидают тухлыми помидорами: "Дескать нет у нас никаких расширений! Мы можем называть файлы как захотим, хоть вообще никак!" В чём-то они конечно правы: в имени файла допустимы любые символы (кроме <span class="quote">&#171;<span class="quote">/</span>&#187;</span> и <span class="quote">&#171;<span class="quote">\x00</span>&#187;</span>), причём в любом порядке - точки так-же можно ставить как нам угодно. 
+					Всё это так, но используя расширения, можно одной командой выполнить любую операцию над любыми типами файлов, и не важно, 10 их или 10000. 
+					Любая операция будет выполнена мгновенно! (не, ну сами понимаете, если надо отправить 10000 мб через дайлапный модем, это не мгновенно, но это лучше, чем отправлять их по одному, ручками). 
+					А так-как информацию о типе(расширение) мы потеряли вместе с именем, неплохо-бы это восстановить (к тому-же, стукнутые на всю голову маздайщики часто хранят свои вирусы в виде big_tits.jpeg, вирус-то у нас не запустится, но и "картинку" посмотреть не получится, не картинка-то вовсе. 
+					Потому есть смысл проверить расширение, а лучше создать его по новому).
+				</div><p>
+			</p><p><a name="add_ext"></a>
+				Всё-бы ничего, только мы теперь не знаем, что это за файлы, и чем их открывать :(  Для исправления этого существует команда <span class="command"><strong>file</strong></span>:
+				</p><pre class="screen">$ /bin/ls | sed -rn 's/^[0-9]+$/file &amp;/ep'
+1753450: MP3 file with ID3 version 2.3.0 tag
+1753451: MP3 file with ID3 version 2.3.0 tag
+1753452: MP3 file with ID3 version 2.3.0 tag
+1753453: MP3 file with ID3 version 2.3.0 tag
+1753454: MP3 file with ID3 version 2.3.0 tag
+1753455: MP3 file with ID3 version 2.3.0 tag
+1753456: MP3 file with ID3 version 2.3.0 tag
+1753457: MP3 file with ID3 version 2.3.0 tag
+1753458: MP3 file with ID3 version 2.3.0 tag
+1753459: MP3 file with ID3 version 2.3.0 tag
+1753460: ASCII text, with CRLF line terminators
+1753461: MP3 file with ID3 version 2.3.0 tag
+1753462: MP3 file with ID3 version 2.3.0 tag
+1753463: MP3 file with ID3 version 2.3.0 tag
+1753464: MP3 file with ID3 version 2.3.0 tag
+1753465: MP3 file with ID3 version 2.3.0 tag
+1753466: JPEG image data, JFIF standard 1.02
+1753467: MP3 file with ID3 version 2.3.0 tag
+1753468: MP3 file with ID3 version 2.3.0 tag
+1753469: MP3 file with ID3 version 2.3.0 tag
+1753470: MP3 file with ID3 version 2.3.0 tag</pre><p>
+				А теперь ещё раз переименуем:
+				</p><div class="example"><a name="id2524275"></a><p class="title"><b>Пример 4.12. Добавление расширения к имени файла.</b></p><div class="example-contents"><a class="ulink" href="examples/add_ext.sed" target="_top">add_ext.sed</a><pre class="programlisting">#!/bin/sed -rnf
+/^[0-9]+$/ {
+	s//file &amp;/e
+	s/^([0-9]+): (.*)/\2\n\1/
+	/^MP3 file/         s/$/.mp3/
+	/^ASCII text/       s/$/.txt/
+	/^JPEG image data/  s/$/.jpg/
+	/\n.*\./            s/^[^\n]+\n([0-9]+)(.*)/mv -v \1 \1\2/ep
+}
+					</pre></div></div><p><br class="example-break">
+				</p><div class="note" title="Замечание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Замечание</h3>
+					Конечно тут добавляются вовсе не все возможные расширения, однако для моего примера этого вполне достаточно.  Вы сами можете добавить необходимые вам типы файлов.
+				</div><p>
+				запускается этот скрипт так:
+				</p><pre class="screen">$ /bin/ls | ./add_ext.sed</pre><p>
+				Конечно ему надо дать права на исполнение:
+				</p><pre class="screen">$ chmod +x add_ext.sed</pre><p>
+				Внутри скрипта я анализирую вывод <span class="command"><strong>file</strong></span>, и в зависимости от этого прибавляю расширение.  Если расширение добавлено, то я переименовываю.
+				</p><div class="note" title="Замечание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Замечание</h3>
+					Обратите внимание на регулярное выражение в первой команде <span class="command"><strong>s</strong></span>, оно отсутствует - используется предыдущее адресное выражение
+					<pre class="programlisting">/^[0-9]+$/</pre></div><p>
+			</p><p>
+				</p><div class="note" title="Замечание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Замечание</h3>
+					Далее будет рассмотрен <a class="link" href="ch04s13.html#pconf">улучшенный вариант</a> этого скрипта.
+				</div><p>
+			</p></div><div class="section" title="Сравнение каталогов."><div class="titlepage"><div><div><h4 class="title"><a name="id2524374"></a>Сравнение каталогов.</h4></div></div></div><p>
+				Вот ещё один пример: требуется сравнить 2 каталога. Сделать это просто, достаточно найти все <span class="emphasis"><em>файлы</em></span> (не каталоги), в первом каталоге, а затем сравнить их с одноимёнными файлами в другом каталоге </p><div class="note" title="Замечание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Замечание</h3>
+					только перед этим, командой <span class="command"><strong>find -type f|wc -l</strong></span> неплохо посмотреть сколько файлов в каталогах. А то следуя нашему алгоритму, мы не сможем найти "лишние" файлы, которые есть во втором каталоге, но нет в первом.
+				</div><p>
+				Скрипт очень простой, но он иллюстрирует некоторые тонкие моменты интеграции sed и bash'а.
+				</p><div class="example"><a name="id2524421"></a><p class="title"><b>Пример 4.13. Сравнение каталогов.</b></p><div class="example-contents"><pre class="programlisting">#!/bin/sh
+
+find $1 -type f | sed -rn "
+s%^$1/(.*)%cmp '&amp;' '$2/\1';echo \$?%pe
+/^0$/b
+p
+q"</pre><div class="note" title="Замечание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Замечание</h3>
+						После имени первого каталога не должно быть слеша, это можно исправить, но мне лень.
+					</div></div></div><p><br class="example-break">
+				Тут всё просто: благодаря модификатору pe команда сначала выводится, а потом выполняется, что-бы было видно как идёт процесс (можно ещё одну sed добавить, что-бы сделать красиво), а вот результат (это число, 0 если файлы одинаковые) никуда не выводится, а проверяется. Если файлы одинаковые, мы переходим к проверки новой пары, а вот если разные - то мы выводим код возврата и прерываем скрипт. При этом cmp выводит диагностическое сообщение, мы его видим на терминале, т.к. оно идёт в поток ошибок.
+				</p><div class="caution" title="Предостережение" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Предостережение</h3>
+					Обратите внимание на экранирование $ после echo: это надо, что-бы выполнилась команда <span class="command"><strong>echo $?</strong></span>, если слеш не за экранировать, то переменная <span class="command"><strong>$?</strong></span> раскроется слишком рано, и будет содержать код возврата <span class="command"><strong>find</strong></span>, а вовсе не <span class="command"><strong>cmp</strong></span>, как нам нужно. Именно из-за таких фокусов я терпеть не могу скрипты в двойных кавычках. 
+					Однако кавычки тут нужны: дело в том, что наш скрипт не работает на файлах с одиночной кавычкой: эта кавычка разбивает имя на две части, причём вторая часть остаётся <span class="emphasis"><em>между</em></span>закавыченными частями - что shell естественно понять не может, и выполнять отказывается. Проще всего разделить такое имя на три части:
+					<div class="orderedlist"><ol class="orderedlist" type="1"><li class="listitem">начало имени <span class="emphasis"><em>'голова'</em></span></li><li class="listitem">одиночная кавычка, что-бы её передать внутрь shell-команды мы её закавычиваем: <span class="emphasis"><em>"'"</em></span> Одиночная кавычка не работает внутри двойных.</li><li class="listitem">Остался <span class="emphasis"><em>'хвост'</em></span>.</li></ol></div>
+					Объединив всё вместе, мы замечаем, что каждую одиночную кавычку надо менять на последовательность '<span class="command"><strong>"</strong></span>'<span class="command"><strong>"</strong></span>'. Ну а так-как весь наш скрипт заключён в одиночные кавычки и вообще-то выполняется shell'ом, то двойные кавычки надо экранировать (из shell-скрипта символы передаются в утилиту sed, а из неё они передаются в другую, внутреннюю shell). Всё это делается командой
+					<pre class="programlisting">s/'/'\"'\"'/g</pre>
+					в самом начале sed-скрипта.
+					<div class="note" title="Замечание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Замечание</h3>
+						Однако я не вставил эту команду в свой скрипт - потому он не сможет сравнивать файлы с кавычками в именах (попробуйте сами).
+					</div></div><p>
+			</p></div><div class="blockquote"><blockquote class="blockquote"><p>
+		Вы можете обсудить этот документ на <a class="ulink" href="http://emulek.tk/forum/viewtopic.php?f=19&amp;t=5026" target="_top">форуме</a>. Текст предоставляется по лицензии <a class="ulink" href="http://www.gnu.org/licenses/fdl.html" target="_top">GNU Free Documentation License</a> (<a class="ulink" href="http://forum.lorcode.org/viewtopic.php?f=15&amp;t=30" target="_top">Перевод лицензии GFDL</a>).
+	</p><p>
+		Вы можете пожертвовать небольшую сумму яндекс-денег на счёт <span class="command"><strong>41001666004238</strong></span> для оплаты хостинга, интернета, и прочего. Это конечно добровольно, однако это намного улучшит данный документ (у меня будет больше времени для его улучшения). На самом деле, проект часто находится на грани закрытия, ибо никаких денег никогда не приносил, и приносить не будет. Вы можете мне помочь. Спасибо.
+	</p></blockquote></div></div><div class="navfooter"><hr><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch04s11.html">Пред.</a> </td><td width="20%" align="center"><a accesskey="u" href="ch04.html">Уровень выше</a></td><td width="40%" align="right"> <a accesskey="n" href="ch04s13.html">След.</a></td></tr><tr><td width="40%" align="left" valign="top">Вырезание комментария в bash скрипте. </td><td width="20%" align="center"><a accesskey="h" href="index.html">Начало</a></td><td width="40%" align="right" valign="top"> Парсинг конфигов.</td></tr></table></div></body></html>

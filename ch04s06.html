@@ -1,0 +1,194 @@
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"><title>Использование внешних утилит.</title><link rel="stylesheet" href="chs/default.css" type="text/css"><meta name="generator" content="DocBook XSL Stylesheets V1.75.1"><link rel="home" href="index.html" title="Краткий учебник по sed."><link rel="up" href="ch04.html" title="Глава 4. Примеры скриптов."><link rel="prev" href="ch04s05.html" title="Подсчёт количества вхождений каждого символа в тексте."><link rel="next" href="ch04s07.html" title="Работа с несколькими строками одновременно (выравнивание текста)."></head><body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF"><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">Использование внешних утилит.</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="ch04s05.html">Пред.</a> </td><th width="60%" align="center">Глава 4. Примеры скриптов.</th><td width="20%" align="right"> <a accesskey="n" href="ch04s07.html">След.</a></td></tr></table><hr></div><div class="section" title="Использование внешних утилит."><div class="titlepage"><div><div><h3 class="title"><a name="id2520555"></a>Использование внешних утилит.</h3></div></div></div><a name="ce"></a><div class="section"><div class="titlepage"></div><p>
+				В sed-скриптах можно (как и большинстве скриптовых языков) не только выполнять команды самой <span class="command"><strong>sed</strong></span>, но и использовать команды оболочки.  
+				Для этого имеется команда <span class="command"><strong>e</strong></span>, которую я почти никогда не использую, а так-же модификатор <code class="option">e</code> для команды <span class="command"><strong>s</strong></span>.  
+				Принцип действия предельно прост: выполняя команду <span class="command"><strong>s///e</strong></span> <span class="command"><strong>sed</strong></span> запускает оболочку, которая выполняет то, что будет находится в буфере после замены.  
+				Но это только в том случае, если замена произошла.  
+				Если замены не было, то ничего не выполнится.  
+				Результат работы команды (то, что она выводит в <code class="filename">stdout</code>) после выполнения команды окажется в буфере, для дальнейшего анализа.  
+				Конечно этот результат вы можете вывести в выходной поток с помощью модификатора <code class="option">ep</code>, при этом модификатор <code class="option">pe</code> так-же допустим, однако работает он по другому.
+				</p><div class="note" title="Замечание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Замечание</h3>
+					Модификатор <code class="option">pe</code> работает следующим образом: сначала буфер выводится в выходной поток, а затем он выполняется.
+				</div><p>
+			</p><p>
+				</p><div class="warning" title="Внимание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Внимание</h3><p>
+						Все эти команды и модификаторы ЧРЕЗВЫЧАЙНО ОПАСНЫ!  Злоумышленник может добавить в текст какой-нибудь вредоносный код, а sed легко передаст его на выполнение оболочке. (<a class="link" href="ch04s04.html#exa_crc">Пример атаки</a>)
+						</p><div class="note" title="Замечание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Замечание</h3>
+							Конечно это относится ко всем скриптовым языкам, как-то perl, php, да и сама оболочка может выполнять такие команды (например eval).
+						</div><p>
+						Особую опасность представляет парсинг текстов из Сети, и применение UTF-8.  С первым понятно, а вот UTF опасно своими <a class="link" href="ch06.html#non_sym">НЕСИМВОЛАМИ</a>:
+					</p><p>
+						Предположим мы выполняем команду
+						</p><pre class="programlisting">s/.*/echo '&amp;'/ep</pre><p>
+						Предполагая, что тут нет никакой опасности: скрипт выведет в выходной поток содержимое буфера.  Но не тут-то было!  Предположим, что в тексте есть НЕСИМВОЛ, тогда выражение /.*/ захватит только начало буфера до этого НЕСИМВОЛА, а оставшийся хвост уедет оболочке, и будет выполнятся...
+					</p></div><p>
+			</p></div><div class="section" title="Добавление в архив"><div class="titlepage"><div><div><h4 class="title"><a name="id2520725"></a>Добавление в архив</h4></div></div></div><p>
+				Ну казалось-бы, что может быть проще?  Выполняем
+				</p><pre class="screen">$ tar -cf arc.tar *</pre><p>
+				и всё добавляется!  Это так...  Вот только мне необходимо было отобрать файлы по особым признакам, что умеет разве-что <span class="command"><strong>find</strong></span>, а потом ещё и отсортировать, для максимального сжатия необходимо что-бы похожие файлы лежали рядом, что <span class="command"><strong>find</strong></span> ни с какими ключами нам не обеспечит.  Что-ж, это сложнее, но именно для этого у нас есть замечательная команда xargs, вот рекомендуемый многими гуру вариант: </p><pre class="screen">$ find . -type f | sort | xargs tar -cf arc.tar</pre><p>
+				Настоящие гуру не будут советовать всякую непроверенную ерунду, они сначала эту ерунду проверят, и лишь за тем посоветуют...  И это работает!  В тестовых примерах...  Беда в том, что часто файлов довольно много (10,000 файлов - это на самом деле не столь-уж и много, бывает и больше), а размер командной строки жёстко ограничен.  Хотя и гуру и убеждали меня в том, что <span class="emphasis"><em>у них</em></span> всё работает, лично я убедился в обратном.  Хорошо ещё, я вовремя заметил, что в архиве не хватает многих файлов, тут сложность в том, что при этом переполнении никаких сообщений не выдаётся, всё работает "нормально", но только с виду - если кильнуть "сохранённые" файлы, вам потом придётся кусать локти, или вешаться (в зависимости от ценности этих файлов).
+				</p><div class="note" title="Замечание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Замечание</h3>
+					Справедливости ради надо сказать, что xargs действительно в большинстве случаев не ошибается - она скармливает команде параметры максимально возможными дозами. Особенно предпочтительно использование её с именами файлов которые оканчиваются нулевым байтом (см. <span class="command"><strong>man xargs</strong></span> на предмет опции <code class="option">-0</code>).
+				</div><p>
+			</p><p>
+				Что-же делать?  Внимательно изучив `man tar' я обнаружил ключ <code class="option">-r</code>, который добавляет файлы в существующий архив.  Отправив вывод find|sort в файл, я прочитал shell-скриптом этот файл построчно, и добавил все файлы в архив.  Вот это действительно работает.  ...Но очень медленно.  Некоторое время я с этим мирился, но потом мне это надоело, и я написал небольшой sed-скрипт: Сначала я создаю архив
+				</p><pre class="programlisting">1{
+		s/.*/tar -cf arc.tar "\0"/ep
+		b
+}</pre><p>
+				Но это только для первого файла, а вот дальше я действую по иному: я добавляю сразу по 32 файла:
+				</p><pre class="programlisting"># если строка делится на 32
+2~32	b add
+# ...или если строка последняя, я добавляю сохранённые строки в архив
+$		b add
+# иначе я сохраняю имя файла
+H
+b
+
+# сохранение
+H
+g
+s/\n/" "/
+s/.*/tar -rf arc.tar "\0"/ep
+# очистка области удержания
+s/.*//
+x</pre><p>
+				</p><div class="warning" title="Внимание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Внимание</h3>
+					Если вы решите применить данный скрипт для бекапа - будьте осторожны: злоумышленник может повысить свои привилегии до супер-пользователя (<a class="link" href="ch02s04.html#bugs_utf">см. здесь</a>), создав у себя файл с кривым именем. Однако обычно это невозможно - в данном случае юникод обычно отключён (конечно это <span class="emphasis"><em>НЕОБХОДИМО</em></span> проверить).
+				</div><p>
+				Этот скрипт НЕ работает ;)  Впрочем, ошибки в нём можно исправить, я думаю вы с этим сами справитесь, проблема в другом: архив не всегда должен быть назван arc.tar, и как передать имя архива в sed-скрипт?  Если, как в <a class="link" href="ch04s04.html#t06_1">примере подсчёта слов</a>, sed-скрипт завёрнут в shell-script, то это не составляет особого труда, например можно так:
+				</p><pre class="programlisting">#!/bin/sh
+sed -r 's/.*/tar -rf '$ARC_NAME' "\0"/ep' file_list.lst</pre><p>
+				Однако у меня был самостоятельный sed-скрипт, и передавать так параметры в него я не мог. Потому я записал имя архива первой строчкой в файл-список, тогда стало проще: в начале я создаю архив как-то так:
+				</p><pre class="programlisting">1{
+	h
+	N
+	s/(.*)\n(.*)/tar -cf "\1" "\2"/ep
+	b
+}</pre><p>
+				При этом, если у меня вообще нет файлов, только название архива, то sed-скрипт вывалится на команде <span class="command"><strong>N</strong></span>, если-же хотя-бы один файл имеется, то будет добавлен первый файл.  Дальше как уже выше написано:
+				</p><pre class="programlisting">H
+2~32 b add
+$! b
+:add
+s/\n/" "/
+s/.*/tar -rf "\0"/ep</pre><p>
+				Вот только очистка буфера немного поменялась - нам не надо стирать первую строку - имя архива, потому:
+				</p><pre class="programlisting">x
+s/\n.*//
+x</pre><p>
+				Вот это уже почти работает...  Почему "почти"?  Читаем далее...
+			</p></div><div class="section" title="Работа над ошибками."><div class="titlepage"><div><div><h4 class="title"><a name="id2520993"></a>Работа над ошибками.</h4></div></div></div><a name="t07_1"></a><p>
+				А что будет, если при добавлении кончится место на диске?  А ничего хорошего - скрипт будет работать как ни в чём на бывало, и завершится с кодом 0, типа "всё хорошо".  Необходимо предусмотреть проверку на код ошибки возвращаемой tar'ом.  Я это сделал так:
+				</p><pre class="programlisting">s/.*/tar -rf "\0" || echo "ERROR"/ep
+/ERROR/ q 77</pre><p>
+				Вот теперь всё в порядке: если архиватор не сможет добавить файлы, он вернёт ненулевой код возврата, что приведёт к выполнению команды echo, и скрипт завершится с кодом 77. (ну я надеюсь, у вас нет файлов с именем ERROR?  У меня - нет.)
+			</p><p>
+				</p><div class="example"><a name="id2521031"></a><p class="title"><b>Пример 4.3. </b></p><div class="example-contents"><a class="ulink" href="examples/add32.sed" target="_top">add32.sed</a><pre class="programlisting">#!/bin/sed -rnf
+
+# Этот скрипт добавляет файлы в архив по 32 штуки
+# в первой строке содержится имя архива, а дальше - список файлов
+
+1 {
+	h
+	N
+	s/(.*)\n(.*)/tar -cpvf "\1" "\2"/ep
+	b
+}
+
+2~32 b add
+$ b add
+
+H
+b
+
+:add
+H
+g
+s/\n/" "/g
+s/.*/tar -rpvf "&amp;" || echo "ERROR"/ep
+/ERROR/ q 77
+x
+s/\n.*//
+x
+b
+					</pre></div></div><p><br class="example-break">
+			</p></div><div class="section" title="Использование сортировки для сжатия каталогов"><div class="titlepage"><div><div><h4 class="title"><a name="id2521056"></a>Использование сортировки для сжатия каталогов</h4></div></div></div><div class="example"><a name="id2521062"></a><p class="title"><b>Пример 4.4. </b></p><div class="example-contents"><pre class="programlisting">#!/bin/sh
+
+if [ $# != 2 ]; then
+	echo "Использование: `basename`   ИМЯ_АРХИВА   КАТАЛОГ_ДЛЯ_СЖАТИЯ
+Применяется утилита add32.sed
+Программа тестировалась при использовании команды find . -type f
+для составления списка файлов. Наверное можно и по другому, но я не пробовал
+некоторые файлы могут иметь копии бекапов созданные командой cp --backup.
+
+автор drBatt (http://emulek.tk).
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE,
+to the extent permitted by law."
+	exit 67
+fi
+
+export LC_ALL=C
+export LANG=C
+
+TMP=`tempfile`
+err=$?
+if [ $err = 0 ]; then
+	TMP2=`tempfile`
+	err=$?
+fi
+if [ $err = 0 ]; then
+	find "$2" -type f &gt; $TMP
+	err=$?
+	if [ $err = 0 ]; then
+		sed -ri '
+			/\.~[0-9]+~$/! s/$/.~0~/
+			s%^(.+)/([^/]+)$%\2/\1%
+			t lb0
+			:lb0
+			s%^([^/]*)\.([^/.]*)\.(~[0-9]+~)/%\2.\1.\3/%
+			t
+			# у этого файла нет расширения
+			s%^%/%
+			' $TMP
+		err=$?
+		if [ $err = 0 ]; then
+			cat $TMP | sort -f &gt;$TMP2
+			err=$?
+			if [ $err = 0 ]; then
+				sed     -ri '
+					s%^/([^/]+)/(.+)$%\2/\1%
+					t lb1
+					s%^([^./]*)\.([^/]*)\.(~[0-9]+~)/(.+)$%\4/\2.\1.\3%
+					:lb1
+					s/\.~0~$//
+					' $TMP2
+				err=$?
+				if [ $err = 0 ]; then
+					echo "$1" &gt; $TMP
+					cat $TMP2 &gt;&gt; $TMP
+					add32.sed $TMP
+					err=$?
+					if [ $err = 0 ]; then
+						bzip2 -vv "$1"
+						err=$?
+					fi
+				fi
+			fi
+		fi
+	fi
+fi
+
+rm $TMP $TMP2
+exit $err
+				</pre></div></div><br class="example-break"><p>
+				Этот скрипт сортирует файлы перед добавлением их в архив. Конечно сортировка производится утилитой <span class="command"><strong>sort</strong></span>. Перед сортировкой имена файлов изменяются: сначала записывается расширение, а потом имя файла. Если у файла есть стандартный бекап-суффикс (который прибавляется командой <span class="command"><strong>cp --backup</strong></span>), то этот суффикс остаётся в конце имени.
+			</p><p>
+				После сортировки имена преобразуются в первоначальный вид, и весь список отправляется вышеописанной утилите <span class="command"><strong>add32.sed</strong></span>
+			</p><p>
+				Затем полученный tar-архив сжимается утилитой <span class="command"><strong>bzip2</strong></span>. За счёт такой сортировки файлов, во многих частных случаях, достигается намного большая степень сжатия (например, когда у нас много почти одинаковых файлов).
+			</p></div><div class="blockquote"><blockquote class="blockquote"><p>
+		Вы можете обсудить этот документ на <a class="ulink" href="http://emulek.tk/forum/viewtopic.php?f=19&amp;t=5026" target="_top">форуме</a>. Текст предоставляется по лицензии <a class="ulink" href="http://www.gnu.org/licenses/fdl.html" target="_top">GNU Free Documentation License</a> (<a class="ulink" href="http://forum.lorcode.org/viewtopic.php?f=15&amp;t=30" target="_top">Перевод лицензии GFDL</a>).
+	</p><p>
+		Вы можете пожертвовать небольшую сумму яндекс-денег на счёт <span class="command"><strong>41001666004238</strong></span> для оплаты хостинга, интернета, и прочего. Это конечно добровольно, однако это намного улучшит данный документ (у меня будет больше времени для его улучшения). На самом деле, проект часто находится на грани закрытия, ибо никаких денег никогда не приносил, и приносить не будет. Вы можете мне помочь. Спасибо.
+	</p></blockquote></div></div><div class="navfooter"><hr><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch04s05.html">Пред.</a> </td><td width="20%" align="center"><a accesskey="u" href="ch04.html">Уровень выше</a></td><td width="40%" align="right"> <a accesskey="n" href="ch04s07.html">След.</a></td></tr><tr><td width="40%" align="left" valign="top">Подсчёт количества вхождений каждого символа в тексте. </td><td width="20%" align="center"><a accesskey="h" href="index.html">Начало</a></td><td width="40%" align="right" valign="top"> Работа с несколькими строками одновременно (выравнивание текста).</td></tr></table></div></body></html>

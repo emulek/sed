@@ -1,0 +1,133 @@
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"><title>Использование sed.</title><link rel="stylesheet" href="chs/default.css" type="text/css"><meta name="generator" content="DocBook XSL Stylesheets V1.75.1"><link rel="home" href="index.html" title="Краткий учебник по sed."><link rel="up" href="ch01.html" title="Глава 1. Краткий учебник про sed."><link rel="prev" href="ch01.html" title="Глава 1. Краткий учебник про sed."><link rel="next" href="ch01s03.html" title="Регулярные выражения."></head><body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF"><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">Использование sed.</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="ch01.html">Пред.</a> </td><th width="60%" align="center">Глава 1. Краткий учебник про sed.</th><td width="20%" align="right"> <a accesskey="n" href="ch01s03.html">След.</a></td></tr></table><hr></div><div class="section" title="Использование sed."><div class="titlepage"><div><div><h3 class="title"><a name="id2509689"></a>Использование sed.</h3></div></div></div><div class="section" title="Как работает sed?"><div class="titlepage"><div><div><h4 class="title"><a name="id2509694"></a>Как работает sed?</h4></div></div></div><p>
+				Утилита sed создана в полном соответствии с принципами UNIX-Way, и пользоваться ей можно так-же как и другими командами shell. <span class="command"><strong>sed</strong></span> ближе всего к <span class="command"><strong>cat</strong></span>, фактически это тоже самое, отличие лишь одно: <span class="command"><strong>cat</strong></span> просто копирует текст, а <span class="command"><strong>sed</strong></span> этот текст может и обрабатывать. Для обработки утилитой sed необходимо задать особые sed-команды, впрочем мы вправе никаких команд и не задавать, и тогда получим полный аналог cat (за исключением некоторых незначительных деталей). 
+				sed-команды задаются первым параметром, наберём к примеру <span class="command"><strong>sed ''</strong></span>. 
+				В кавычках я набрал необходимый для утилиты sed-скрипт, в данном случае пустой, потому sed никак не изменит текст. Набрав эту команду мы не увидим ничего, кроме курсора - по умолчанию <span class="command"><strong>sed</strong></span> читает входной поток с клавиатуры, и выводит его на экран (как и <span class="command"><strong>cat</strong></span>), мы можем так-же перенаправить выходной поток в файл, к примеру <span class="command"><strong>sed '' &gt; dest.txt</strong></span>, а можем скопировать один файл в другой: <span class="command"><strong>sed '' src.txt &gt; dest.txt</strong></span>, ну и как в случае с cat, мы можем объединять файлы: <span class="command"><strong>sed '' *.html &gt; all.html</strong></span>.
+				</p><div class="note" title="Замечание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Замечание</h3>
+					Так получилось потому, что ни cat, ни sed на самом деле <span class="emphasis"><em>не объединяет файлы</em></span>. Сначала действует оболочка, раскрывая *.html в отсортированный по алфавиту набор файлов, к пример, если у нас есть 3 файла 1.html, 2.html, и 3.html, то sed получит 4 параметра:
+					<div class="orderedlist"><ol class="orderedlist" type="1"><li class="listitem">'' - пустой скрипт.</li><li class="listitem">1.html</li><li class="listitem">2.html</li><li class="listitem">3.html</li></ol></div>
+					Далее sed последовательно читает все три файла, применяя к каждой строке в них sed-скрипт (пустой в данном случае). Результат выводится в выходной поток. Вот тут действие sed заканчивается, и опять начинает работать оболочка, последовательно записывая весь вывод в файл all.html. Потому код cat примитивен (пара строк на C), она просто читает входные файлы и выводит их в выходной поток, без всякой обработки, поисков и слияний. (Правда cat ещё и может нумеровать строки с ключом <code class="option">-n</code>).
+				</div><p>
+			</p><p>
+				Основное отличие sed от cat заключается в том, что sed ещё и может обрабатывать текст. Для этого нужно написать особый <span class="emphasis"><em>sed-скрипт</em></span>, команды в котором в большинстве своём заимствованны из вышеописанного редактора ed.
+				</p><div class="caution" title="Предостережение" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Предостережение</h3>
+					Вообще говоря, sed-скрипт необязательно заключать именно в одиночные кавычки, иногда его можно вообще оставить без всяких кавычек, однако, в этом случае его попытается раскрыть оболочка, что может привести к неожиданным последствиям. При этом, правильная работа скрипта будет зависеть от множества случайных причин, иногда он будет работать, иногда - нет. Более подробно этот вопрос будет рассмотрен ниже.
+				</div><p>
+				К примеру рассмотрим самый просто sed-скрипт:
+				</p><div class="example"><a name="id2509903"></a><p class="title"><b>Пример 1.2. Простейший скрипт.</b></p><div class="example-contents"><p>(файл test.c приведён выше)</p><p>
+						<span class="command"><strong>sed 'p' test.c</strong></span>
+						</p><pre class="screen">
+#include &lt;stdio.h&gt;
+#include &lt;stdio.h&gt;
+
+
+/* comment */
+/* comment */
+
+
+int main()
+int main()
+{
+{
+	printf("тестовый файл\n");
+	printf("тестовый файл\n");
+	return 0;
+	return 0;
+}
+}
+
+
+						</pre><p>
+						Как видите, такой скрипт приводит к удвоению каждой строки. 
+						<span class="command"><strong>sed</strong></span> обычно выводит обработанные строки, но тут я применил команду <span class="command"><strong>p</strong></span>, которая то-же выводит строку, потому строки удваиваются. 
+						В отличие от <span class="command"><strong>ed</strong></span>, <span class="command"><strong>sed</strong></span> применяет команду к каждой строке (если не указан адрес).
+					</p></div></div><p><br class="example-break">
+			</p></div><div class="section" title="Применение адресных выражений в sed."><div class="titlepage"><div><div><h4 class="title"><a name="id2509961"></a>Применение адресных выражений в sed.</h4></div></div></div><p>
+				Так-же как и в ed, доступны адресные выражения, например:
+				</p><div class="example"><a name="id2509972"></a><p class="title"><b>Пример 1.3. Применение адреса.</b></p><div class="example-contents"><span class="command"><strong>sed '1d' test.c</strong></span><pre class="screen">
+
+/* comment */
+
+int main()
+{
+	printf("тестовый файл\n");
+	return 0;
+}
+					</pre>
+					Этот скрипт удалил первую строку из файла.
+					<div class="note" title="Замечание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Замечание</h3>
+						На самом деле действие команды d несколько иное, и отличается от действия той-же команды в редакторе ed, однако, для нас это пока не важно. Строки тут действительно удаляются, а тонкие моменты мы рассмотрим позже.
+					</div></div></div><p><br class="example-break">
+			</p><p>
+				Так-же доступны и более сложные адресные выражения:
+				</p><div class="example"><a name="id2510012"></a><p class="title"><b>Пример 1.4. Сложное адресное выражение.</b></p><div class="example-contents"><span class="command"><strong>sed '/{/,/}/!d' test.c</strong></span><pre class="screen">
+{
+	printf("тестовый файл\n");
+	return 0;
+}
+					</pre>
+					Адресное выражение в данном случае <code class="option">/{/,/}/</code>, т.е. от открывающей, до закрывающей фигурной скобки, однако, из-за восклицательного знака после адреса, команда выполняется для тех строк, которые не совпадают с адресным выражением. А команда у нас <span class="command"><strong>d</strong></span>, которая удаляет строки из выходного потока. Таким образом, данный скрипт удаляет все строки, кроме тех, которые образуют блок между {}.
+					<div class="note" title="Замечание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Замечание</h3>
+						Это всего-лишь простой пример, и его не следует использовать на практике: проблемы начнутся если блоки вложенные (такое допускается во всех известных мне языках)
+					</div></div></div><p><br class="example-break">
+			</p></div><div class="section" title="sed-скрипты из нескольких команд."><div class="titlepage"><div><div><h4 class="title"><a name="id2510071"></a>sed-скрипты из нескольких команд.</h4></div></div></div>
+			Можно перечислить несколько команд, в качестве разделителя используя точку с запятой, к примеру:
+			<div class="example"><a name="id2510083"></a><p class="title"><b>Пример 1.5. Скрипт из нескольких команд.</b></p><div class="example-contents"><span class="command"><strong>sed '/i/d;/p/d' test.c</strong></span><pre class="screen">
+
+/* comment */
+
+{
+	return 0;
+}
+
+				</pre>
+				Этот скрипт состоит из двух команд: первая удаляет строки в которых есть буква i, а вторая удаляет строки с буквой p.
+				<div class="note" title="Замечание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Замечание</h3>
+					На самом деле, этот скрипт работает совсем по другому. Ожидаемого результата можно добиться скриптом <span class="command"><strong>/[ip]/d</strong></span>, который во первых использует регулярное выражение (о них в следующей главе), а во вторых тут всего одна команда. Проблема данного варианта в том, что команда <span class="command"><strong>d</strong></span> не удаляет строки, а прерывает работу скрипта, потому, найдя в строке i, sed просто перейдёт к анализу следующей строки, не проверяя, есть-ли там буква p, причём перейдёт молча, без всякого вывода. В данном конкретном случае это нас более чем устраивает, это даже будет быстрее, если в тексте больше i, чем p (но медленнее, если много p, а i - мало). Чуть позже мы рассмотрим более подробно работу этой команды, сейчас только могу посоветовать либо не использовать <span class="command"><strong>d</strong></span>, либо использовать её последней в скрипте.
+				</div></div></div><br class="example-break">
+			Адресное выражение действует только на одну команду, как сделать, что-бы оно подействовало на несколько? Для этого команды нужно заключить в фигурные скобки, например:
+			<div class="example"><a name="id2510175"></a><p class="title"><b>Пример 1.6. Объединение команд в блок.</b></p><div class="example-contents"><span class="command"><strong>sed '3{p;p}' test.c</strong></span><pre class="screen">
+#include &lt;stdio.h&gt;
+
+/* comment */
+/* comment */
+/* comment */
+
+int main()
+{
+	printf("тестовый файл\n");
+	return 0;
+}
+
+				</pre>
+				Тут утраивается третья строка. Если-бы скобок не было, то первая команда <span class="command"><strong>p</strong></span> выполнилась-бы для третьей строки, а вторая для всех строк в файле. В итоге, третья строка была-бы напечатана трижды, а все остальные дважды.
+			</div></div><br class="example-break"></div><div class="section" title="Использование перевода строки для разделение команд, и создание sed-скриптов в файле."><div class="titlepage"><div><div><h4 class="title"><a name="id2510209"></a>Использование перевода строки для разделение команд, и создание sed-скриптов в файле.</h4></div></div></div>
+			sed команды можно разделять не только точкой с запятой, но и записывая по одной или по несколько команд в новой строке. В bash'е это не слишком удобно, однако все эти команды можно записать в отдельный файл, который затем передать sed. Что-бы sed знала, что это не скрипт, а файл со скриптом внутри, воспользуйтесь ключом <code class="option">-f</code>. Так-же можно заставить оболочку самостоятельно выполнить этот скрипт: достаточно в первой строке скрипта записать
+			<pre class="programlisting">#!/bin/sed -f</pre>
+			Кроме того, необходимо разрешить право выполнения этого файла.
+			<div class="note" title="Замечание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Замечание</h3>
+				Как всегда, для запуска скрипта который передаётся интерпретатору (в данном случае sed) достаточно лишь права чтения, однако, для самостоятельного запуска необходимо так-же право на исполнение. Установить это право можно bash-командой <span class="command"><strong>chmod +x my_script</strong></span>. Кроме того, текущая директория в Linux обычно не входит в список директорий, в которых производится поиск файлов для исполнения (по соображениям безопасности), потому вам придётся так-же указать путь к файлу, либо (когда вы решите, что это хороший скрипт, и он вам постоянно нужен) скопировать его в один из каталогов с исполняемыми файлами (конечно для этого потребуются права root'а, обычные юзеры не должны иметь прав делать файлы доступными для выполнения всеми подряд во всей системе). Что-бы злоумышленник не смог изменить ваш скрипт, после копирования смените владельца и группу на root:root и установите права 0755.
+				<div class="warning" title="Внимание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Внимание</h3>
+					Ну и к sed-скрипту относятся всё, что и к обычной программе: там тоже возможны уязвимости, глюки, и баги. Его тоже можно "сломать", к примеру скормив ему особым образом приготовленный файл, который выполнит необходимые злоумышленнику действия. Невозможно запретить чтение исполняемого файла(имеется ввиду - скрипта), потому злоумышленник всегда может посмотреть код скрипта, который он может исполнять. Потому sed-скрипты считаются опасными. Однако, я думаю, что опасность sed-скриптов не выше (ИМХО ниже) чем опасность любого другого файла, который так-же всегда можно прочитать. Как всегда, опасность подстерегает только тех, кто слабо разбирается <span class="emphasis"><em>что</em></span> он делает. Использование C намного опаснее - ведь ваш компилятор и используемые вами библиотеки новые, и о многих уязвимостях вам не известно (точнее никому сегодня не известно, но будет известно злоумышленнику завтра). Конечно, не стоит устанавливать SUID бит скрипту (я правда не знаю, возможно-ли это, никогда так не делал), для получения необходимых прав используйте sudo.
+				</div></div>
+			Использовать перевод строки в качестве разделителя команд может потребоваться в том случае, если команда имеет параметр, который может содержать точку с запятой (например команда <span class="command"><strong>a</strong></span>, которая добавляет произвольный текст после строки).
+			<div class="tip" title="Подсказка" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Подсказка</h3>
+				Для извращенцев, которые считают, что "только одностроки рулят" дам совет: вы можете использовать несколько скриптов в одной команде, для этого перед каждым скриптом используйте ключ <code class="option">-e</code>.
+			</div></div><div class="section" title="sed и vim"><div class="titlepage"><div><div><h4 class="title"><a name="id2510387"></a>sed и vim</h4></div></div></div><p>
+				Sed-скрипты можно писать в любом редакторе, однако (кто-бы сомневался :-) ) удобнее всего использовать <span class="command"><strong>vim</strong></span> - в отличие от других редакторов vim распознаёт sed-скрипты и раскрашивает их:
+				</p><div class="figure"><a name="id2510409"></a><p class="title"><b>Рисунок 1.1. Редактирование sed-скрипта в vim.</b></p><div class="figure-contents"><div><img src="img/snapshot13.png" alt="Редактирование sed-скрипта в vim."></div></div></div><p><br class="figure-break">
+				Вы можете скачать мой файл раскраски <a class="ulink" href="examples/sed.vim" target="_top">sed.vim</a>. (тот что шёл по умолчанию - недоделанный, там не хватает некоторых команд и флагов). У меня этот файл лежит в <code class="filename">/usr/share/vim/vim72/syntax/sed.vim</code>.
+			</p><p>
+				Конечно можно использовать и любой другой редактор, только не забывайте включить нужную кодировку и завершать скрипт переводом строки (все известные мне редакторы кроме vim'а не добавляют автоматически перевод строки в конец файла).
+			</p><p>
+				В скрипте между командами может быть любое количество любых пробельных символов, они игнорируются (в т.ч. и '\n'). Используйте отступы и табуляцию, что-бы ваш скрипт было легче читать.
+			</p></div><div class="section" title="Подавление вывода ключом -n"><div class="titlepage"><div><div><h4 class="title"><a name="id2510468"></a>Подавление вывода ключом <code class="option">-n</code></h4></div></div></div>
+			После обработки каждой строки sed выводит её в выходной поток, используя ключ <code class="option">-n</code> вы можете запретить это.
+			<div class="example"><a name="id2510486"></a><p class="title"><b>Пример 1.7. Использование ключа <code class="option">-n</code></b></p><div class="example-contents"><span class="command"><strong>sed -n '3p' test.c</strong></span><pre class="screen">/* comment */</pre>
+				тут выводится только третья строка.
+				<div class="note" title="Замечание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Замечание</h3>
+					Есть альтернатива - запретить вывод всех строк кроме третьей, <span class="command"><strong>sed '3!d' test.c</strong></span>, но лучше так не делать, из-за особенностей команды <span class="command"><strong>d</strong></span>.
+				</div></div></div><br class="example-break"></div><div class="blockquote"><blockquote class="blockquote"><p>
+		Вы можете обсудить этот документ на <a class="ulink" href="http://emulek.tk/forum/viewtopic.php?f=19&amp;t=5026" target="_top">форуме</a>. Текст предоставляется по лицензии <a class="ulink" href="http://www.gnu.org/licenses/fdl.html" target="_top">GNU Free Documentation License</a> (<a class="ulink" href="http://forum.lorcode.org/viewtopic.php?f=15&amp;t=30" target="_top">Перевод лицензии GFDL</a>).
+	</p><p>
+		Вы можете пожертвовать небольшую сумму яндекс-денег на счёт <span class="command"><strong>41001666004238</strong></span> для оплаты хостинга, интернета, и прочего. Это конечно добровольно, однако это намного улучшит данный документ (у меня будет больше времени для его улучшения). На самом деле, проект часто находится на грани закрытия, ибо никаких денег никогда не приносил, и приносить не будет. Вы можете мне помочь. Спасибо.
+	</p></blockquote></div></div><div class="navfooter"><hr><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch01.html">Пред.</a> </td><td width="20%" align="center"><a accesskey="u" href="ch01.html">Уровень выше</a></td><td width="40%" align="right"> <a accesskey="n" href="ch01s03.html">След.</a></td></tr><tr><td width="40%" align="left" valign="top">Глава 1. Краткий учебник про sed. </td><td width="20%" align="center"><a accesskey="h" href="index.html">Начало</a></td><td width="40%" align="right" valign="top"> Регулярные выражения.</td></tr></table></div></body></html>

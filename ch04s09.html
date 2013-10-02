@@ -1,0 +1,33 @@
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"><title>Ещё один подход к регулировке жадности.</title><link rel="stylesheet" href="chs/default.css" type="text/css"><meta name="generator" content="DocBook XSL Stylesheets V1.75.1"><link rel="home" href="index.html" title="Краткий учебник по sed."><link rel="up" href="ch04.html" title="Глава 4. Примеры скриптов."><link rel="prev" href="ch04s08.html" title="Изменение регистра букв."><link rel="next" href="ch04s10.html" title="Парсинг HTML."></head><body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF"><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">Ещё один подход к регулировке жадности.</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="ch04s08.html">Пред.</a> </td><th width="60%" align="center">Глава 4. Примеры скриптов.</th><td width="20%" align="right"> <a accesskey="n" href="ch04s10.html">След.</a></td></tr></table><hr></div><div class="section" title="Ещё один подход к регулировке жадности."><div class="titlepage"><div><div><h3 class="title"><a name="id2522534"></a>Ещё один подход к регулировке жадности.</h3></div></div></div><div class="section" title="Вырезание комментариев в HTML."><div class="titlepage"><div><div><h4 class="title"><a name="id2522540"></a>Вырезание комментариев в HTML.</h4></div></div></div><p>
+				Про жадность я уже много написал, регулярные выражения в sed жадные, однако, мы можем фильтровать текст не только в пределах одной строки, но и так-же по несколько строк сразу. Для этого в <span class="command"><strong>sed</strong></span> предусмотрены диапазоны адресов, от чего-то, до чего-то другого.  В качестве адреса можно использовать номер строки или регулярные выражения.  Такой диапазон естественно не жадный, например
+				</p><pre class="programlisting">/X/,/Y/p</pre><p>
+				распечатает всё от первой X, до первой-же Y.  Мы сейчас проанализируем HTML текст, в котором мы выделим комментарии.  Именно HTML был взят потому, что в нём можно вставлять и убирать любое количество переводов строки, при этом, результат отображения текста не меняется (в HTML любое количество символов ` ', '\t', `\n' и `\r' эквивалентно одиночному пробелу). Что-бы выделить комментарий можно конечно собрать большую строку, в которой этот комментарий полностью укладывается, а затем, используя маркёры, его выделить.  Это довольно долгая и нудная история,
+				</p><div class="note" title="Замечание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Замечание</h3>
+					Тем не менее, на практике я поступил именно так.
+				</div><p>
+				потому мы поступим по другому:  во первых, переформатируем текст так, что-бы строка с комментарием всегда начиналась на &lt;!--, и всегда заканчивалась на --&gt; Сделать это очень просто - достаточно вставить нужное число символов перевода строки:
+				</p><pre class="screen">$ sed 's/&lt;!--/\n\0/g; s/--&gt;/\0\n/g'</pre><p>
+				А теперь все строки у нас поделятся на 5 категорий:
+				</p><div class="orderedlist"><ol class="orderedlist" type="1"><li class="listitem">Обычные строки, с ними мы ничего не делаем.</li><li class="listitem">строки, которые полностью содержат комментарий, такие строки всегда начинаются на &lt;!--, и заканчиваются на --&gt;, мы их просто распечатаем.</li><li class="listitem">Строки, которые начинают комментарий, но в которых нет окончания.</li><li class="listitem">Окончание комментария.</li><li class="listitem">Строки комментария, которые лежат между строками #3 и #4.</li></ol></div><p>
+				Сначала отфильтруем и распечатаем строки #2:
+				</p><pre class="screen">$ sed -n '/&lt;!--.*--&gt;/{p;b}'</pre><p>
+				Команда <span class="command"><strong>b</strong></span> тут необходима для того, что-бы данные строки не мешались дальнейшему анализу.
+				</p><div class="note" title="Замечание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Замечание</h3>
+					Команда <span class="command"><strong>b</strong></span> без параметров приводит к выполнению <a class="link" href="ch02.html#e3">третьего этапа</a>, к выводу буфера (хотя этот вывод в данном случае подавлен ключом <code class="option">-n</code>) и переходу к загрузке сл. строки.
+				</div><p>
+				А вот теперь можно легко отфильтровать строки #3, #4, и #5:
+				</p><pre class="screen">$ sed -n '/&lt;!--.*--&gt;/{p;b}; /&lt;!--/,/--&gt;/p'</pre><p>
+				Точно так-же можно выделять и обрабатывать скрипты и таблицы в HTML тексте.  Заменив команду <span class="command"><strong>p</strong></span> на что-то вроде
+				</p><pre class="programlisting">{
+	w comments.html
+	d
+}</pre><p>
+				можно отправить комменты в файл, а в выходном потоке останется чистый HTML без комментариев.
+				</p><div class="note" title="Замечание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Замечание</h3>
+					Конечно тут есть ошибка ;) Конкретно - в команде <span class="command"><strong>w</strong></span>.
+				</div><p>
+			</p></div><div class="blockquote"><blockquote class="blockquote"><p>
+		Вы можете обсудить этот документ на <a class="ulink" href="http://emulek.tk/forum/viewtopic.php?f=19&amp;t=5026" target="_top">форуме</a>. Текст предоставляется по лицензии <a class="ulink" href="http://www.gnu.org/licenses/fdl.html" target="_top">GNU Free Documentation License</a> (<a class="ulink" href="http://forum.lorcode.org/viewtopic.php?f=15&amp;t=30" target="_top">Перевод лицензии GFDL</a>).
+	</p><p>
+		Вы можете пожертвовать небольшую сумму яндекс-денег на счёт <span class="command"><strong>41001666004238</strong></span> для оплаты хостинга, интернета, и прочего. Это конечно добровольно, однако это намного улучшит данный документ (у меня будет больше времени для его улучшения). На самом деле, проект часто находится на грани закрытия, ибо никаких денег никогда не приносил, и приносить не будет. Вы можете мне помочь. Спасибо.
+	</p></blockquote></div></div><div class="navfooter"><hr><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch04s08.html">Пред.</a> </td><td width="20%" align="center"><a accesskey="u" href="ch04.html">Уровень выше</a></td><td width="40%" align="right"> <a accesskey="n" href="ch04s10.html">След.</a></td></tr><tr><td width="40%" align="left" valign="top">Изменение регистра букв. </td><td width="20%" align="center"><a accesskey="h" href="index.html">Начало</a></td><td width="40%" align="right" valign="top"> Парсинг HTML.</td></tr></table></div></body></html>

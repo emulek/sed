@@ -1,0 +1,95 @@
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"><title>Регулярные выражения, некоторые сложности...</title><link rel="stylesheet" href="chs/default.css" type="text/css"><meta name="generator" content="DocBook XSL Stylesheets V1.75.1"><link rel="home" href="index.html" title="Краткий учебник по sed."><link rel="up" href="ch04.html" title="Глава 4. Примеры скриптов."><link rel="prev" href="ch04.html" title="Глава 4. Примеры скриптов."><link rel="next" href="ch04s03.html" title="Поиск одинаковых подстрок."></head><body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF"><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">Регулярные выражения, некоторые сложности...</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="ch04.html">Пред.</a> </td><th width="60%" align="center">Глава 4. Примеры скриптов.</th><td width="20%" align="right"> <a accesskey="n" href="ch04s03.html">След.</a></td></tr></table><hr></div><div class="section" title="Регулярные выражения, некоторые сложности..."><div class="titlepage"><div><div><h3 class="title"><a name="id2518124"></a>Регулярные выражения, некоторые сложности...</h3></div></div></div><a name="exx"></a><div class="section" title="Поиск с использованием же жадной звёздочки."><div class="titlepage"><div><div><h4 class="title"><a name="id2518133"></a>Поиск с использованием же жадной звёздочки.</h4></div></div></div>
+			Ок, припомним наш изначальный текст, о котором я писал в <a class="link" href="ch02.html#test_txt">первой части</a>, попробуем выделить оттуда слово Linux, целиком писать это мне лень, потому я напишу только <span class="quote">&#171;<span class="quote">L</span>&#187;</span> и <span class="quote">&#171;<span class="quote">x</span>&#187;</span>, таким образом результат будет выглядеть так:
+			<div class="figure"><a name="id2518163"></a><p class="title"><b>Рисунок 4.1. Поиск шаблона <span class="quote">&#171;<span class="quote">L.*x</span>&#187;</span></b></p><div class="figure-contents"><div><img src="img/snapshot6.png" alt="Поиск шаблона L.*x"></div></div></div><br class="figure-break"><div class="note" title="Замечание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Замечание</h3>
+			Здесь и далее будут картинки. В картинках всё намного виднее. Я использую стандартные коды: например <span class="emphasis"><em>\x1b31m</em></span> означает тёмно-красный цвет, <span class="emphasis"><em>\x1b31;1m</em></span> - светло-красный.
+		</div>
+		Ключ <code class="option">-n</code> говорит о том, что печатать ничего не надо, всё печатает сам скрипт, командой <span class="command"><strong>s</strong></span>, с модификатором <code class="option">p</code>, да и то, если шаблон нужный найдётся.  Ампресанд (&amp;) - это особый символ в выражении для замены, как и <span class="quote">&#171;<span class="quote">\0</span>&#187;</span> он означает - <span class="emphasis"><em>всё что нашлось</em></span>.  Как видите, в большинстве случаев результат ожидаемый, вот только...
+		<pre class="screen">Linux из UNIX. Многие вещи, которые есть в Linux</pre>
+		в тех случаях, когда обрабатывается строки, в которых есть 2 буквы <span class="quote">&#171;<span class="quote">x</span>&#187;</span>, sed захватывает слишком много.  Нам хотелось-бы выделить оба слова, а вовсе не всё вместе.  Конечно в php или в перле можно использовать не жадные выражения, у нас это невозможно.  Что-же делать? Самое простое - захватить не <span class="emphasis"><em>любой</em></span> символ, а <span class="emphasis"><em>любой кроме <span class="quote">&#171;<span class="quote">x</span>&#187;</span></em></span>.
+		<div class="figure"><a name="id2518260"></a><p class="title"><b>Рисунок 4.2. Поиск шаблона L[^x]*x</b></p><div class="figure-contents"><div><img src="img/snapshot7.png" alt="Поиск шаблона L[^x]*x"></div></div></div><br class="figure-break">
+		Безусловно, это очень просто, и это - работает.  Но не всегда...  Что-же делать, если у нас не <span class="quote">&#171;<span class="quote">x</span>&#187;</span>, а что-то более сложное, например <span class="quote">&#171;<span class="quote">ux</span>&#187;</span>?  Т.е., мы желаем найти подстроки, которые начинаются на <span class="quote">&#171;<span class="quote">L</span>&#187;</span>, и кончаются на <span class="quote">&#171;<span class="quote">ux</span>&#187;</span>, причём не жадно, только маленькие.  У нас нет нежадных выражений, у нас так-же нет отрицаний, мы не можем записать "найди подстроку, где нет <span class="quote">&#171;<span class="quote">ux</span>&#187;</span>" Потому приходится извращатся.
+		</div><div class="section" title="Выделение выражения по частям."><div class="titlepage"><div><div><h4 class="title"><a name="id2518311"></a><a name="t01"></a>Выделение выражения по частям.</h4></div></div></div>
+			Для начала, выделим эти строчки:
+			<pre class="screen">$ sed -rn 's/(L.*ux).*/\1/;T;s/[^L]*L/L/;p' test.txt
+Linux
+Linux
+Linux
+Linux из UNIX. Многие вещи, которые есть в Linux
+Linux
+Linux
+Linux
+Linux
+Linux
+Linux
+Linux</pre>
+			Как видите, это почти всегда работает, это уже хорошо, осталось совсем чуть-чуть.  Что-же я сделал?  В первой команде <span class="command"><strong>s</strong></span>, я искал строки, в которых есть буква <span class="quote">&#171;<span class="quote">L</span>&#187;</span>, за которой идёт <span class="quote">&#171;<span class="quote">ux</span>&#187;</span>, а после них - что угодно.  Да, первая звёздочка слишком жадная, и иногда она захватывает (как мы видим) слишком много - не беда.  Этой-же командой я отрезал хвост - заключив нужное в скобки, а затем написав в выражении для замены \1.  Обращаю ваше внимание - башка, то что идёт перед <span class="quote">&#171;<span class="quote">L</span>&#187;</span> - так и осталось висеть, это тоже не важно, важно, что я нашёл то, что нужно! А вот теперь, я применяю команду <span class="command"><strong>T</strong></span> - она завершает скрипт тогда, и только тогда, когда замена не состоялась.  Тем самым, я отсеиваю ненужные строки, и перехожу уже к анализу нужных.  А мне сейчас надо вырезать всё то, что идёт перед <span class="quote">&#171;<span class="quote">L</span>&#187;</span>.  Тут я воспользовался выше рассмотренным приёмом - я вырезаю всё то что <span class="emphasis"><em>не L</em></span>.  И далее - печатаю.  Сейчас задача упростилась: достаточно вырезать всё то, что идёт после <span class="emphasis"><em>первого <span class="quote">&#171;<span class="quote">ux</span>&#187;</span></em></span>:
+			<pre class="screen">$ sed -rn 's/(L.*ux).*/\1/;T;s/[^L]*L/L/;s/(ux).*/\1/;p' test.txt
+Linux
+Linux
+Linux
+Linux
+Linux
+Linux
+Linux
+Linux
+Linux
+Linux
+Linux</pre>
+			Ха!  Тот-же самый эффект был-бы получен выражением
+			<div class="figure"><a name="id2518418"></a><p class="title"><b>Рисунок 4.3. Поиск шаблона L.*ux</b></p><div class="figure-contents"><div><img src="img/snapshot8.png" alt="Поиск шаблона L.*ux"></div></div></div><br class="figure-break">
+			Вот только это так только в данном случае - дело в том, что в четвёртой строке затесался второй Linux, а не первый, как мы ожидали...  Это связано тоже с жадностью - звёздочка жадная, и первая-же звёздочка пожрёт всё что сможет, в том числе и букву <span class="quote">&#171;<span class="quote">L</span>&#187;</span> и весь первый <span class="quote">&#171;<span class="quote">Linux</span>&#187;</span> (даже несмотря на то, что он подходит под шаблон в скобках).
+		</div><div class="section" title="Использование маркёров."><div class="titlepage"><div><div><h4 class="title"><a name="id2518451"></a><a name="mark"></a>Использование маркёров.</h4></div></div></div><p>
+				Предположим, нам надо найти и выделить какие-то подстроки среди текста.  Они находятся между временем и IP-адресом, при этом, нам необходимо использовать не жадные выражения, т.е. из
+				</p><pre class="programlisting">asdffggh 00:12:21 jfkd  12:38:46 kfkldfkfdlf 192.168.1.2 jfkjdjf 81.66.1.43</pre><p>
+				нам надо выделить
+				</p><pre class="programlisting">12:38:46 kfkldfkfdlf 192.168.1.2</pre><p>
+				В данном случае, я использую <span class="emphasis"><em>маркёры</em></span>, особые байты для разделения текста.  В исходном тексте этих маркёров не бывает, потому я могу искать и выделять подстроки между маркёрами, а вовсе не между сложными подвыражениями. Например ip это </p><pre class="programlisting">/([0-9]{1,3}\.){3}[0-9]{1,3}/</pre><p> при этом подвыражения надо ещё и сохранять, в отличие от маркёров, значение которых известно, и сохранять потому их не требуется.
+			</p><p>
+				В качестве маркёров проще всего использовать символ перевода строки <span class="quote">&#171;<span class="quote">\n</span>&#187;</span>, просто потому, что ни в одной загруженной sed строке такого символа нет, и быть не может.  Впрочем на практике я могу использовать и другие байты, главное - в исходном тексте их быть не должно, иначе мы запутаемся.  Использование перевода строки - хорошая идея, однако она не слишком удобна при отладке. В качестве маркёров часто можно использовать и символы которые часто встречаются в тексте, конечно с осторожностью, что-бы не запутаться. К примеру, <a class="link" href="ch04s04.html#t06_2">при анализе логов</a>, я использовал маркёр `~', он может быть в логах, но мне нужно было отфильтровать дату в начале, а вот в дате `~' не встречается.
+			</p><p>
+				В моём тестовом файле нет символа Q, и для наглядности именно его я и буду использовать в качестве маркёра (не забывайте, это всего-лишь пример!).  
+				А искать я буду тоже намного более простое - просто символы между <span class="quote">&#171;<span class="quote">о</span>&#187;</span> и <span class="quote">&#171;<span class="quote">а</span>&#187;</span> - это можно сделать намного проще, но я рассматриваю общий случай: вместо <span class="quote">&#171;<span class="quote">о</span>&#187;</span> (и <span class="quote">&#171;<span class="quote">а</span>&#187;</span>) может быть сверхсложное регулярное выражение. 
+				Просто в моём тестовом примере множество хитрых комбинаций этих букв.
+			</p><p>
+				Во-первых ограничим область поиска: если <a class="link" href="ch04s02.html#t01">на прошлой страничке</a> я использовал для этого команду <span class="command"><strong>T</strong></span>', то сейчас я воспользуюсь адресом, я буду обрабатывать только строки, в которых есть /о.*а/, при этом всю обработку я заключу в фигурные скобки - <span class="quote">&#171;<span class="quote">{}</span>&#187;</span>.
+			</p><p>
+				Хм... Вот тут ИМХО проще сделать всё с двумя маркёрами, в качестве второго можно использовать например <span class="quote">&#171;<span class="quote">\r</span>&#187;</span>, которого нет ни в одном Linux-тексте, а если такой текст и есть - то это можно исправить, просто стерев этот символ
+				</p><div class="note" title="Замечание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Замечание</h3>
+					Windows-редакторы вставляют вовсе не <span class="quote">&#171;<span class="quote">\n</span>&#187;</span> в конце строки, а комбинацию <span class="quote">&#171;<span class="quote">\r\n</span>&#187;</span>.  А вот в компах от корпорации Apple принято завершать строку символом <span class="quote">&#171;<span class="quote">\r</span>&#187;</span>.
+				</div><p>
+				В примере-же я буду для наглядности использовать нерусскую букву <span class="quote">&#171;<span class="quote">T</span>&#187;</span>, таких букв у меня тоже нет.
+				Т.к. надо искать совпадение между <span class="quote">&#171;<span class="quote">о</span>&#187;</span> и <span class="quote">&#171;<span class="quote">а</span>&#187;</span>, то мы вставим <span class="quote">&#171;<span class="quote">Q</span>&#187;</span> перед <span class="quote">&#171;<span class="quote">о</span>&#187;</span>, и <span class="quote">&#171;<span class="quote">T</span>&#187;</span> после <span class="quote">&#171;<span class="quote">а</span>&#187;</span>:
+				</p><div class="figure"><a name="id2518703"></a><p class="title"><b>Рисунок 4.4. Поиск и замена маркёров.</b></p><div class="figure-contents"><div><img src="img/snapshot9.png" alt="Поиск и замена маркёров."></div></div></div><p><br class="figure-break">
+				Глядя на этот результат, можно легко сформулировать нужное правило: нам требуется найти первое <span class="quote">&#171;<span class="quote">Q</span>&#187;</span>, после которой идёт <span class="quote">&#171;<span class="quote">T</span>&#187;</span>, причём между этими <span class="quote">&#171;<span class="quote">Q</span>&#187;</span> и <span class="quote">&#171;<span class="quote">T</span>&#187;</span> не должно быть других маркёров. Буквально перекладывая это в регулярные выражения получаем </p><pre class="programlisting">/.*Q([^QT]*)T.*/</pre><p> Вот только такое RE найдёт вовсе не первое, а <span class="emphasis"><em>последнее</em></span> совпадение!  Проще всего сделать всё это в два приёма: сначала отрубить хвост:
+				</p><div class="figure"><a name="id2518757"></a><p class="title"><b>Рисунок 4.5. Отрубаем хвост.</b></p><div class="figure-contents"><div><img src="img/snapshot10.png" alt="Отрубаем хвост."></div></div></div><p><br class="figure-break">
+				А теперь рубим голову, от начала, и до последней Q:
+				</p><pre class="screen">$ sed -rn '/о.*а/{ s/о/Q\0/g; s/а/\0T/g; s/(Q[^QT]*)T.*/\1/; s/.*Q//; p}' test.txt
+оста
+опера
+омпа
+ода
+ова
+ор. На
+ов на
+о, Linux ведёт себя та
+оцесс. Если Windows изна
+ова
+оста
+ова
+оча
+олуча
+ова
+оста
+ова
+ома</pre><p>
+				Вот - тут и пригодилась жадность - звёздочка пожрала все <span class="quote">&#171;<span class="quote">Q</span>&#187;</span> до последней!
+			</p><p>
+				Вся прелесть использования маркёров в том, что мы помечаем какую-либо подстроку одиночным символом, что позволяет нам во-первых резко уменьшить сложность и громоздкость скриптов, во-вторых позволяет использовать отрицание - мы не можем написать выражение, которое <span class="emphasis"><em>НЕ</em></span> подходит, например мы не можем написать: <span class="emphasis"><em>найди <span class="quote">&#171;<span class="quote">X</span>&#187;</span>, в котором нет <span class="quote">&#171;<span class="quote">Y</span>&#187;</span></em></span>, если <span class="quote">&#171;<span class="quote">Y</span>&#187;</span> - не тривиально, однако, используя маркёры мы можем это сделать - <span class="quote">&#171;<span class="quote">[^Y]</span>&#187;</span> совпадает с любым символом исключая <span class="quote">&#171;<span class="quote">Y</span>&#187;</span>.
+			</p><p>
+				В некоторых случаях есть смысл не добавлять, а заменять что-то маркёром, тогда, когда это что-то одинаковое, либо оно нам не понадобится - это конечно сильно ускоряет работу наших скриптов. 
+				Кстати, о быстродействии: не следует думать, что такие извраты сильно замедляют работу скриптов по сравнению скажем с тем-же перлом (там часто можно просто ограничить жадность) - дело в том, что не жадные квантификаторы и в перле работают медленно, и часто программеры их используют не оправдано, в sed-же мы используем такие извращения только в тех редких случаях, когда это действительно необходимо.
+			</p></div><div class="blockquote"><blockquote class="blockquote"><p>
+		Вы можете обсудить этот документ на <a class="ulink" href="http://emulek.tk/forum/viewtopic.php?f=19&amp;t=5026" target="_top">форуме</a>. Текст предоставляется по лицензии <a class="ulink" href="http://www.gnu.org/licenses/fdl.html" target="_top">GNU Free Documentation License</a> (<a class="ulink" href="http://forum.lorcode.org/viewtopic.php?f=15&amp;t=30" target="_top">Перевод лицензии GFDL</a>).
+	</p><p>
+		Вы можете пожертвовать небольшую сумму яндекс-денег на счёт <span class="command"><strong>41001666004238</strong></span> для оплаты хостинга, интернета, и прочего. Это конечно добровольно, однако это намного улучшит данный документ (у меня будет больше времени для его улучшения). На самом деле, проект часто находится на грани закрытия, ибо никаких денег никогда не приносил, и приносить не будет. Вы можете мне помочь. Спасибо.
+	</p></blockquote></div></div><div class="navfooter"><hr><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch04.html">Пред.</a> </td><td width="20%" align="center"><a accesskey="u" href="ch04.html">Уровень выше</a></td><td width="40%" align="right"> <a accesskey="n" href="ch04s03.html">След.</a></td></tr><tr><td width="40%" align="left" valign="top">Глава 4. Примеры скриптов. </td><td width="20%" align="center"><a accesskey="h" href="index.html">Начало</a></td><td width="40%" align="right" valign="top"> Поиск одинаковых подстрок.</td></tr></table></div></body></html>

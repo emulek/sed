@@ -1,0 +1,81 @@
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"><title>Вырезание комментария в bash скрипте.</title><link rel="stylesheet" href="chs/default.css" type="text/css"><meta name="generator" content="DocBook XSL Stylesheets V1.75.1"><link rel="home" href="index.html" title="Краткий учебник по sed."><link rel="up" href="ch04.html" title="Глава 4. Примеры скриптов."><link rel="prev" href="ch04s10.html" title="Парсинг HTML."><link rel="next" href="ch04s12.html" title="Переименование файлов."></head><body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF"><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">Вырезание комментария в bash скрипте.</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="ch04s10.html">Пред.</a> </td><th width="60%" align="center">Глава 4. Примеры скриптов.</th><td width="20%" align="right"> <a accesskey="n" href="ch04s12.html">След.</a></td></tr></table><hr></div><div class="section" title="Вырезание комментария в bash скрипте."><div class="titlepage"><div><div><h3 class="title"><a name="id2523450"></a>Вырезание комментария в bash скрипте.</h3></div></div></div><div class="section"><div class="titlepage"></div><p>
+				Задача вырезания комментариев из bash-скрипта очень сложна: дело в том, что допустимо использовать 2 вида кавычек, причём внутри кавычек не работают другие кавычки и # не является началом комментария. Кроме того, в двойных кавычках могут быть экранированные двойные, а в одиночных - не могут. Закавыченные блоки могут расползтись на несколько строк. И ещё вне кавычек так-же могут встречаться экранированные кавычки и #.
+			</p><p>
+				Основная идея скрипта - сохранить строку (строки) в области удержания, и отрезать в строке всё до начала комментария. После чего можно удалить найденный комментарий из строки (как при поиске одинаковых подстрок). Все строки бывают 6и видов:
+				</p><div class="orderedlist"><ol class="orderedlist" type="1"><li class="listitem">
+						Строки начинающиеся с любого символа кроме <span class="quote">&#171;<span class="quote">'</span>&#187;</span>, <span class="quote">&#171;<span class="quote">"</span>&#187;</span>, <span class="quote">&#171;<span class="quote">#</span>&#187;</span>, и <span class="quote">&#171;<span class="quote">\</span>&#187;</span>. В этих строках я удаляю все первые символы до первого спец-символа, и строка становится одной из 2,3,4,5 или 6го типа.
+					</li><li class="listitem">
+						Строки которые начинаются на <span class="quote">&#171;<span class="quote">\</span>&#187;</span> - это какой-то экранированный символ - его можно удалить, и снова проверить тип получившейся строки.
+					</li><li class="listitem">
+						Строки которые начинаются на <span class="quote">&#171;<span class="quote">#</span>&#187;</span>, это начала комментария, и можно его отрезать.
+					</li><li class="listitem">
+						Пустые строки - значит комментария нет, и строку можно печатать.
+					</li><li class="listitem">
+						Строки которые начинаются на одиночную кавычку <span class="quote">&#171;<span class="quote">'</span>&#187;</span> - если в строке есть ещё одна одиночная кавычка, всё что между ними можно резать, и их тоже. Если второй кавычки нет, то нужно загрузить ещё одну строку, и продолжить анализ. Текущая строка нам не нужна, можно в новой строке вставить в начало одиночную кавычку, и продолжить анализ.
+					</li><li class="listitem">
+						Строки начинающиеся с двойной кавычки <span class="quote">&#171;<span class="quote">"</span>&#187;</span>. Обрабатываются как и строки типа 5, однако есть тонкость - возможен случай, когда внутри двойных кавычек есть экранированная двойная кавычка - она не является концом блока и удаляется.
+					</li></ol></div><p>
+			</p><p>
+				Вот сам скрипт:
+				</p><div class="example"><a name="id2523607"></a><p class="title"><b>Пример 4.11. Удаление комментариев в bash-скрипте.</b></p><div class="example-contents"><pre class="programlisting">#!/bin/sed -rf
+
+# сохранение строки
+h
+
+:begin_loop
+	# p
+	# удаление обычного начала
+	s/^[^'"#\]+(.*)/\1/
+	t begin_loop
+	# удаление экранированных символов
+	s/^\\.//
+	t begin_loop
+	# удаление закавыченного блока
+	s/^'[^']*'//
+	t begin_loop
+	s/^'.*//
+	T lq
+		# незакрытый блок кавычек, необходима подгрузка
+		${
+			x
+			b end
+		}
+		n
+		H
+		s/^/'/
+		t begin_loop
+	:lq
+	# удаление экранированной кавычки внутри закавыченного блока
+	s/^"[^"]*\\"/"/
+	t begin_loop
+	# удаление закавыченного блока
+	s/^"[^"]*"//
+	t begin_loop
+	s/^".*//
+	T lq2
+		${
+			x
+			b end
+		}
+	n
+	H
+	s/^/"/
+	t begin_loop
+	:lq2
+	/^\#/{
+		# теперь строка начинается с #
+		H
+		x
+		s/^(.*)(\#[^\n]*)\n\2$/\1/
+		b end
+	}
+	# а коммента и нету
+	x
+
+	:end
+# s/.*/\x1b[32m'&amp;'\x1b[0m/</pre></div></div><p><br class="example-break">
+			</p></div><div class="blockquote"><blockquote class="blockquote"><p>
+		Вы можете обсудить этот документ на <a class="ulink" href="http://emulek.tk/forum/viewtopic.php?f=19&amp;t=5026" target="_top">форуме</a>. Текст предоставляется по лицензии <a class="ulink" href="http://www.gnu.org/licenses/fdl.html" target="_top">GNU Free Documentation License</a> (<a class="ulink" href="http://forum.lorcode.org/viewtopic.php?f=15&amp;t=30" target="_top">Перевод лицензии GFDL</a>).
+	</p><p>
+		Вы можете пожертвовать небольшую сумму яндекс-денег на счёт <span class="command"><strong>41001666004238</strong></span> для оплаты хостинга, интернета, и прочего. Это конечно добровольно, однако это намного улучшит данный документ (у меня будет больше времени для его улучшения). На самом деле, проект часто находится на грани закрытия, ибо никаких денег никогда не приносил, и приносить не будет. Вы можете мне помочь. Спасибо.
+	</p></blockquote></div></div><div class="navfooter"><hr><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch04s10.html">Пред.</a> </td><td width="20%" align="center"><a accesskey="u" href="ch04.html">Уровень выше</a></td><td width="40%" align="right"> <a accesskey="n" href="ch04s12.html">След.</a></td></tr><tr><td width="40%" align="left" valign="top">Парсинг HTML. </td><td width="20%" align="center"><a accesskey="h" href="index.html">Начало</a></td><td width="40%" align="right" valign="top"> Переименование файлов.</td></tr></table></div></body></html>

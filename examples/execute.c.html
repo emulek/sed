@@ -1,0 +1,1844 @@
+<html>
+<head>
+<title>~/source/sed-4.2/sed/execute.c.html</title>
+<meta name="Generator" content="Vim/6.3">
+<meta http-equiv="content-type" content="text/html; charset=KOI8-R">
+</head>
+<body bgcolor="#000000" text="#ffffff">
+<pre>
+<font color="#00ffff">/*</font><font color="#00ffff">  GNU SED, a batch stream editor.</font>
+<font color="#00ffff">    Copyright (C) 1989,90,91,92,93,94,95,98,99,2002,2003,2004,2005,2006,2008,2009</font>
+<font color="#00ffff">    Free Software Foundation, Inc.</font>
+
+<font color="#00ffff">    This program is free software; you can redistribute it and/or modify</font>
+<font color="#00ffff">    it under the terms of the GNU General Public License as published by</font>
+<font color="#00ffff">    the Free Software Foundation; either version 3, or (at your option)</font>
+<font color="#00ffff">    any later version.</font>
+
+<font color="#00ffff">    This program is distributed in the hope that it will be useful,</font>
+<font color="#00ffff">    but WITHOUT ANY WARRANTY; without even the implied warranty of</font>
+<font color="#00ffff">    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the</font>
+<font color="#00ffff">    GNU General Public License for more details.</font>
+
+<font color="#00ffff">    You should have received a copy of the GNU General Public License</font>
+<font color="#00ffff">    along with this program; if not, write to the Free Software</font>
+<font color="#00ffff">    Foundation, 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA. </font><font color="#00ffff">*/</font>
+
+<font color="#ff40ff">#undef EXPERIMENTAL_DASH_N_OPTIMIZATION </font><font color="#00ffff">/*</font><font color="#00ffff">don't use -- is very buggy</font><font color="#00ffff">*/</font>
+<font color="#ff40ff">#define INITIAL_BUFFER_SIZE </font><font color="#ffff00">50</font>
+<font color="#ff40ff">#define FREAD_BUFFER_SIZE   </font><font color="#ffff00">8192</font>
+
+<font color="#ff40ff">#include </font><font color="#ffff00">&quot;sed.h&quot;</font>
+
+<font color="#ff40ff">#include </font><font color="#ffff00">&lt;stddef.h&gt;</font>
+<font color="#ff40ff">#include </font><font color="#ffff00">&lt;stdio.h&gt;</font>
+<font color="#ff40ff">#include </font><font color="#ffff00">&lt;ctype.h&gt;</font>
+
+<font color="#ff40ff">#include </font><font color="#ffff00">&lt;errno.h&gt;</font>
+<font color="#ff40ff">#ifndef errno</font>
+<font color="#00ff00">extern</font> <font color="#00ff00">int</font> errno;
+<font color="#ff40ff">#endif</font>
+
+<font color="#ff40ff">#ifdef HAVE_UNISTD_H</font>
+<font color="#ff40ff"># include </font><font color="#ffff00">&lt;unistd.h&gt;</font>
+<font color="#ff40ff">#endif</font>
+
+<font color="#ff40ff">#ifndef BOOTSTRAP</font>
+<font color="#ff40ff">#include </font><font color="#ffff00">&quot;acl.h&quot;</font>
+<font color="#ff40ff">#endif</font>
+
+<font color="#ff40ff">#ifdef __GNUC__</font>
+<font color="#ff40ff"># if __GNUC__ &gt; </font><font color="#ffff00">2</font><font color="#ff40ff"> || (__GNUC__ == </font><font color="#ffff00">2</font><font color="#ff40ff"> &amp;&amp; __GNUC_MINOR__-</font><font color="#ffff00">0</font><font color="#ff40ff"> &gt;= </font><font color="#ffff00">7</font><font color="#ff40ff">)</font>
+   <font color="#00ffff">/*</font><font color="#00ffff"> silence warning about unused parameter even for &quot;gcc -W -Wunused&quot; </font><font color="#00ffff">*/</font>
+<font color="#ff40ff">#  define UNUSED    __attribute__((unused))</font>
+<font color="#ff40ff"># endif</font>
+<font color="#ff40ff">#endif</font>
+<font color="#ff40ff">#ifndef UNUSED</font>
+<font color="#ff40ff"># define UNUSED</font>
+<font color="#ff40ff">#endif</font>
+
+<font color="#ff40ff">#ifdef HAVE_STRINGS_H</font>
+<font color="#ff40ff"># include </font><font color="#ffff00">&lt;strings.h&gt;</font>
+<font color="#ff40ff">#else</font>
+<font color="#ff40ff"># include </font><font color="#ffff00">&lt;string.h&gt;</font>
+<font color="#ff40ff">#endif</font> <font color="#00ffff">/*</font><font color="#00ffff">HAVE_STRINGS_H</font><font color="#00ffff">*/</font>
+<font color="#ff40ff">#ifdef HAVE_MEMORY_H</font>
+<font color="#ff40ff"># include </font><font color="#ffff00">&lt;memory.h&gt;</font>
+<font color="#ff40ff">#endif</font>
+
+<font color="#ff40ff">#ifndef HAVE_STRCHR</font>
+<font color="#ff40ff"># define strchr index</font>
+<font color="#ff40ff"># define strrchr rindex</font>
+<font color="#ff40ff">#endif</font>
+
+<font color="#ff40ff">#ifdef HAVE_STDLIB_H</font>
+<font color="#ff40ff"># include </font><font color="#ffff00">&lt;stdlib.h&gt;</font>
+<font color="#ff40ff">#endif</font>
+<font color="#ff40ff">#ifndef EXIT_SUCCESS</font>
+<font color="#ff40ff"># define </font><font color="#ffff00">EXIT_SUCCESS</font><font color="#ff40ff"> </font><font color="#ffff00">0</font>
+<font color="#ff40ff">#endif</font>
+
+<font color="#ff40ff">#ifdef HAVE_SYS_TYPES_H</font>
+<font color="#ff40ff"># include </font><font color="#ffff00">&lt;sys/types.h&gt;</font>
+<font color="#ff40ff">#endif</font>
+
+<font color="#ff40ff">#include </font><font color="#ffff00">&lt;sys/stat.h&gt;</font>
+<font color="#ff40ff">#include </font><font color="#ffff00">&quot;stat-macros.h&quot;</font>
+
+<span class=""><hr class="PAGE-BREAK"></span>
+<font color="#00ffff">/*</font><font color="#00ffff"> Sed operates a line at a time. </font><font color="#00ffff">*/</font>
+<font color="#00ff00">struct</font> line {
+  <font color="#00ff00">char</font> *text;       <font color="#00ffff">/*</font><font color="#00ffff"> Pointer to line allocated by malloc. </font><font color="#00ffff">*/</font>
+  <font color="#00ff00">char</font> *active;     <font color="#00ffff">/*</font><font color="#00ffff"> Pointer to non-consumed part of text. </font><font color="#00ffff">*/</font>
+  <font color="#00ff00">size_t</font> length;    <font color="#00ffff">/*</font><font color="#00ffff"> Length of text (or active, if used). </font><font color="#00ffff">*/</font>
+  <font color="#00ff00">size_t</font> alloc;     <font color="#00ffff">/*</font><font color="#00ffff"> Allocated space for active. </font><font color="#00ffff">*/</font>
+  <font color="#00ff00">bool</font> chomped;     <font color="#00ffff">/*</font><font color="#00ffff"> Was a trailing newline dropped? </font><font color="#00ffff">*/</font>
+<font color="#ff40ff">#ifdef HAVE_MBRTOWC</font>
+  <font color="#00ff00">mbstate_t</font> mbstate;
+<font color="#ff40ff">#endif</font>
+};
+
+<font color="#ff40ff">#ifdef HAVE_MBRTOWC</font>
+<font color="#ff40ff">#define SIZEOF_LINE offsetof (</font><font color="#00ff00">struct</font><font color="#ff40ff"> line, mbstate)</font>
+<font color="#ff40ff">#else</font>
+<font color="#ff40ff">#define SIZEOF_LINE (</font><font color="#ffff00">sizeof</font><font color="#ff40ff"> (</font><font color="#00ff00">struct</font><font color="#ff40ff"> line))</font>
+<font color="#ff40ff">#endif</font>
+
+<font color="#00ffff">/*</font><font color="#00ffff"> A queue of text to write out at the end of a cycle</font>
+<font color="#00ffff">   (filled by the &quot;a&quot;, &quot;r&quot; and &quot;R&quot; commands.) </font><font color="#00ffff">*/</font>
+<font color="#00ff00">struct</font> append_queue {
+  <font color="#00ff00">const</font> <font color="#00ff00">char</font> *fname;
+  <font color="#00ff00">char</font> *text;
+  <font color="#00ff00">size_t</font> textlen;
+  <font color="#00ff00">struct</font> append_queue *next;
+  <font color="#00ff00">bool</font> free;
+};
+
+<font color="#00ffff">/*</font><font color="#00ffff"> State information for the input stream. </font><font color="#00ffff">*/</font>
+<font color="#00ff00">struct</font> input {
+  <font color="#00ffff">/*</font><font color="#00ffff"> The list of yet-to-be-opened files.  It is invalid for file_list</font>
+<font color="#00ffff">     to be NULL.  When *file_list is NULL we are currently processing</font>
+<font color="#00ffff">     the last file.  </font><font color="#00ffff">*/</font>
+
+  <font color="#00ff00">char</font> **file_list;
+
+  <font color="#00ffff">/*</font><font color="#00ffff"> Count of files we failed to open. </font><font color="#00ffff">*/</font>
+  countT bad_count;
+
+  <font color="#00ffff">/*</font><font color="#00ffff"> Current input line number (over all files).  </font><font color="#00ffff">*/</font>
+  countT line_number;
+
+  <font color="#00ffff">/*</font><font color="#00ffff"> True if we'll reset line numbers and addresses before</font>
+<font color="#00ffff">     starting to process the next (possibly the first) file.  </font><font color="#00ffff">*/</font>
+  <font color="#00ff00">bool</font> reset_at_next_file;
+
+  <font color="#00ffff">/*</font><font color="#00ffff"> Function to read one line.  If FP is NULL, read_fn better not</font>
+<font color="#00ffff">     be one which uses fp; in particular, read_always_fail() is</font>
+<font color="#00ffff">     recommended. </font><font color="#00ffff">*/</font>
+  <font color="#00ff00">bool</font> (*read_fn) P_((<font color="#00ff00">struct</font> input *)); <font color="#00ffff">/*</font><font color="#00ffff"> read one line </font><font color="#00ffff">*/</font>
+
+  <font color="#00ff00">char</font> *out_file_name;
+
+  <font color="#00ff00">const</font> <font color="#00ff00">char</font> *in_file_name;
+
+  <font color="#00ffff">/*</font><font color="#00ffff"> if NULL, none of the following are valid </font><font color="#00ffff">*/</font>
+  <font color="#00ff00">FILE</font> *fp;
+
+  <font color="#00ff00">bool</font> no_buffering;
+};
+
+
+<font color="#00ffff">/*</font><font color="#00ffff"> Have we done any replacements lately?  This is used by the `t' command. </font><font color="#00ffff">*/</font>
+<font color="#00ff00">static</font> <font color="#00ff00">bool</font> replaced = <font color="#ffff00">false</font>;
+
+<font color="#00ffff">/*</font><font color="#00ffff"> The current output file (stdout if -i is not being used. </font><font color="#00ffff">*/</font>
+<font color="#00ff00">static</font> <font color="#00ff00">struct</font> output output_file;
+
+<font color="#00ffff">/*</font><font color="#00ffff"> The `current' input line. </font><font color="#00ffff">*/</font>
+<font color="#00ff00">static</font> <font color="#00ff00">struct</font> line line;
+
+<font color="#00ffff">/*</font><font color="#00ffff"> An input line used to accumulate the result of the s and e commands. </font><font color="#00ffff">*/</font>
+<font color="#00ff00">static</font> <font color="#00ff00">struct</font> line s_accum;
+
+<font color="#00ffff">/*</font><font color="#00ffff"> An input line that's been stored by later use by the program </font><font color="#00ffff">*/</font>
+<font color="#00ff00">static</font> <font color="#00ff00">struct</font> line hold;
+
+<font color="#00ffff">/*</font><font color="#00ffff"> The buffered input look-ahead.  The only field that should be</font>
+<font color="#00ffff">   used outside of read_mem_line() or line_init() is buffer.length. </font><font color="#00ffff">*/</font>
+<font color="#00ff00">static</font> <font color="#00ff00">struct</font> line buffer;
+
+<font color="#00ff00">static</font> <font color="#00ff00">struct</font> append_queue *append_head = <font color="#ffff00">NULL</font>;
+<font color="#00ff00">static</font> <font color="#00ff00">struct</font> append_queue *append_tail = <font color="#ffff00">NULL</font>;
+
+<span class=""><hr class="PAGE-BREAK"></span>
+<font color="#ff40ff">#ifdef BOOTSTRAP</font>
+<font color="#00ffff">/*</font><font color="#00ffff"> We can't be sure that the system we're boostrapping on has</font>
+<font color="#00ffff">   memchr(), and ../lib/memchr.c requires configuration knowledge</font>
+<font color="#00ffff">   about how many bits are in a `long'.  This implementation</font>
+<font color="#00ffff">   is far from ideal, but it should get us up-and-limping well</font>
+<font color="#00ffff">   enough to run the configure script, which is all that matters.</font>
+<font color="#00ffff">*/</font>
+<font color="#ff40ff"># ifdef memchr</font>
+<font color="#ff40ff">#  undef memchr</font>
+<font color="#ff40ff"># endif</font>
+<font color="#ff40ff"># define memchr bootstrap_memchr</font>
+
+<font color="#00ff00">static</font> VOID *bootstrap_memchr P_((<font color="#00ff00">const</font> VOID *s, <font color="#00ff00">int</font> c, <font color="#00ff00">size_t</font> n));
+<font color="#00ff00">static</font> VOID *
+bootstrap_memchr(s, c, n)
+  <font color="#00ff00">const</font> VOID *s;
+  <font color="#00ff00">int</font> c;
+  <font color="#00ff00">size_t</font> n;
+{
+  <font color="#00ff00">char</font> *p;
+
+  <font color="#ffff00">for</font> (p=(<font color="#00ff00">char</font> *)s; n-- &gt; <font color="#ffff00">0</font>; ++p)
+    <font color="#ffff00">if</font> (*p == c)
+      <font color="#ffff00">return</font> p;
+  <font color="#ffff00">return</font> CAST(VOID *)<font color="#ffff00">0</font>;
+}
+<font color="#ff40ff">#endif</font> <font color="#00ffff">/*</font><font color="#00ffff">BOOTSTRAP</font><font color="#00ffff">*/</font>
+
+<font color="#00ffff">/*</font><font color="#00ffff"> increase a struct line's length, making some attempt at</font>
+<font color="#00ffff">   keeping realloc() calls under control by padding for future growth.  </font><font color="#00ffff">*/</font>
+<font color="#00ff00">static</font> <font color="#00ff00">void</font> resize_line P_((<font color="#00ff00">struct</font> line *, <font color="#00ff00">size_t</font>));
+<font color="#00ff00">static</font> <font color="#00ff00">void</font>
+resize_line(lb, len)
+  <font color="#00ff00">struct</font> line *lb;
+  <font color="#00ff00">size_t</font> len;
+{
+  <font color="#00ff00">int</font> inactive;
+  inactive = lb-&gt;active - lb-&gt;text;
+
+  <font color="#00ffff">/*</font><font color="#00ffff"> If the inactive part has got to more than two thirds of the buffer,</font>
+<font color="#00ffff">   * remove it. </font><font color="#00ffff">*/</font>
+  <font color="#ffff00">if</font> (inactive &gt; lb-&gt;alloc * <font color="#ffff00">2</font>)
+    {
+      MEMMOVE(lb-&gt;text, lb-&gt;active, lb-&gt;length);
+      lb-&gt;alloc += lb-&gt;active - lb-&gt;text;
+      lb-&gt;active = lb-&gt;text;
+      inactive = <font color="#ffff00">0</font>;
+
+      <font color="#ffff00">if</font> (lb-&gt;alloc &gt; len)
+    <font color="#ffff00">return</font>;
+    }
+
+  lb-&gt;alloc *= <font color="#ffff00">2</font>;
+  <font color="#ffff00">if</font> (lb-&gt;alloc &lt; len)
+    lb-&gt;alloc = len;
+  <font color="#ffff00">if</font> (lb-&gt;alloc &lt; INITIAL_BUFFER_SIZE)
+    lb-&gt;alloc = INITIAL_BUFFER_SIZE;
+
+  lb-&gt;text = REALLOC(lb-&gt;text, inactive + lb-&gt;alloc, <font color="#00ff00">char</font>);
+  lb-&gt;active = lb-&gt;text + inactive;
+}
+
+<font color="#00ffff">/*</font><font color="#00ffff"> Append `length' bytes from `string' to the line `to'. </font><font color="#00ffff">*/</font>
+<font color="#00ff00">static</font> <font color="#00ff00">void</font> str_append P_((<font color="#00ff00">struct</font> line *, <font color="#00ff00">const</font> <font color="#00ff00">char</font> *, <font color="#00ff00">size_t</font>));
+<font color="#00ff00">static</font> <font color="#00ff00">void</font>
+str_append(to, string, length)
+  <font color="#00ff00">struct</font> line *to;
+  <font color="#00ff00">const</font> <font color="#00ff00">char</font> *string;
+  <font color="#00ff00">size_t</font> length;
+{
+  <font color="#00ff00">size_t</font> new_length = to-&gt;length + length;
+
+  <font color="#ffff00">if</font> (to-&gt;alloc &lt; new_length)
+    resize_line(to, new_length);
+  MEMCPY(to-&gt;active + to-&gt;length, string, length);
+  to-&gt;length = new_length;
+
+<font color="#ff40ff">#ifdef HAVE_MBRTOWC</font>
+  <font color="#ffff00">if</font> (mb_cur_max &gt; <font color="#ffff00">1</font> &amp;&amp; !is_utf8)
+    <font color="#ffff00">while</font> (length)
+      {
+        <font color="#00ff00">size_t</font> n = MBRLEN (string, length, &amp;to-&gt;mbstate);
+
+        <font color="#00ffff">/*</font><font color="#00ffff"> An invalid sequence is treated like a singlebyte character. </font><font color="#00ffff">*/</font>
+        <font color="#ffff00">if</font> (n == (<font color="#00ff00">size_t</font>) -<font color="#ffff00">1</font>)
+      {
+        memset (&amp;to-&gt;mbstate, <font color="#ffff00">0</font>, <font color="#ffff00">sizeof</font> (to-&gt;mbstate));
+        n = <font color="#ffff00">1</font>;
+      }
+
+        <font color="#ffff00">if</font> (n &gt; <font color="#ffff00">0</font>)
+      {
+        string += n;
+        length -= n;
+      }
+        <font color="#ffff00">else</font>
+      <font color="#ffff00">break</font>;
+      }
+<font color="#ff40ff">#endif</font>
+}
+
+<font color="#00ff00">static</font> <font color="#00ff00">void</font> str_append_modified P_((<font color="#00ff00">struct</font> line *, <font color="#00ff00">const</font> <font color="#00ff00">char</font> *, <font color="#00ff00">size_t</font>,
+                    <font color="#00ff00">enum</font> replacement_types));
+<font color="#00ff00">static</font> <font color="#00ff00">void</font>
+str_append_modified(to, string, length, type)
+  <font color="#00ff00">struct</font> line *to;
+  <font color="#00ff00">const</font> <font color="#00ff00">char</font> *string;
+  <font color="#00ff00">size_t</font> length;
+  <font color="#00ff00">enum</font> replacement_types type;
+{
+<font color="#ff40ff">#ifdef HAVE_MBRTOWC</font>
+  <font color="#00ff00">mbstate_t</font> from_stat;
+
+  <font color="#ffff00">if</font> (type == REPL_ASIS)
+    {
+      str_append(to, string, length);
+      <font color="#ffff00">return</font>;
+    }
+
+  <font color="#ffff00">if</font> (to-&gt;alloc - to-&gt;length &lt; length * mb_cur_max)
+    resize_line(to, to-&gt;length + length * mb_cur_max);
+
+  MEMCPY (&amp;from_stat, &amp;to-&gt;mbstate, <font color="#ffff00">sizeof</font>(<font color="#00ff00">mbstate_t</font>));
+  <font color="#ffff00">while</font> (length)
+    {
+      <font color="#00ff00">wchar_t</font> wc;
+      <font color="#00ff00">int</font> n = MBRTOWC (&amp;wc, string, length, &amp;from_stat);
+
+      <font color="#00ffff">/*</font><font color="#00ffff"> An invalid sequence is treated like a singlebyte character. </font><font color="#00ffff">*/</font>
+      <font color="#ffff00">if</font> (n == -<font color="#ffff00">1</font>)
+        {
+          memset (&amp;to-&gt;mbstate, <font color="#ffff00">0</font>, <font color="#ffff00">sizeof</font> (from_stat));
+          n = <font color="#ffff00">1</font>;
+        }
+
+      <font color="#ffff00">if</font> (n &gt; <font color="#ffff00">0</font>)
+        string += n, length -= n;
+      <font color="#ffff00">else</font>
+    {
+      <font color="#00ffff">/*</font><font color="#00ffff"> Incomplete sequence, copy it manually.  </font><font color="#00ffff">*/</font>
+      str_append(to, string, length);
+      <font color="#ffff00">return</font>;
+    }
+
+      <font color="#00ffff">/*</font><font color="#00ffff"> Convert the first character specially... </font><font color="#00ffff">*/</font>
+      <font color="#ffff00">if</font> (type &amp; (REPL_UPPERCASE_FIRST | REPL_LOWERCASE_FIRST))
+    {
+          <font color="#ffff00">if</font> (type &amp; REPL_UPPERCASE_FIRST)
+            wc = towupper(wc);
+          <font color="#ffff00">else</font>
+            wc = towlower(wc);
+
+          type &amp;= ~(REPL_LOWERCASE_FIRST | REPL_UPPERCASE_FIRST);
+      <font color="#ffff00">if</font> (type == REPL_ASIS)
+        {
+          n = WCRTOMB (to-&gt;active + to-&gt;length, wc, &amp;to-&gt;mbstate);
+          to-&gt;length += n;
+          str_append(to, string, length);
+          <font color="#ffff00">return</font>;
+        }
+        }
+
+      <font color="#ffff00">else</font> <font color="#ffff00">if</font> (type &amp; REPL_UPPERCASE)
+        wc = towupper(wc);
+      <font color="#ffff00">else</font>
+        wc = towlower(wc);
+
+      <font color="#00ffff">/*</font><font color="#00ffff"> Copy the new wide character to the end of the string. </font><font color="#00ffff">*/</font>
+      n = WCRTOMB (to-&gt;active + to-&gt;length, wc, &amp;to-&gt;mbstate);
+      to-&gt;length += n;
+      <font color="#ffff00">if</font> (n == -<font color="#ffff00">1</font>)
+    {
+      fprintf (<font color="#ffff00">stderr</font>, <font color="#ffff00">&quot;Case conversion produced an invalid character!&quot;</font>);
+      abort ();
+    }
+    }
+<font color="#ff40ff">#else</font>
+  <font color="#00ff00">size_t</font> old_length = to-&gt;length;
+  <font color="#00ff00">char</font> *start, *end;
+
+  str_append(to, string, length);
+  start = to-&gt;active + old_length;
+  end = start + length;
+
+  <font color="#00ffff">/*</font><font color="#00ffff"> Now do the required modifications.  First \[lu]... </font><font color="#00ffff">*/</font>
+  <font color="#ffff00">if</font> (type &amp; REPL_UPPERCASE_FIRST)
+    {
+      *start = toupper(*start);
+      start++;
+      type &amp;= ~REPL_UPPERCASE_FIRST;
+    }
+  <font color="#ffff00">else</font> <font color="#ffff00">if</font> (type &amp; REPL_LOWERCASE_FIRST)
+    {
+      *start = tolower(*start);
+      start++;
+      type &amp;= ~REPL_LOWERCASE_FIRST;
+    }
+
+  <font color="#ffff00">if</font> (type == REPL_ASIS)
+    <font color="#ffff00">return</font>;
+
+  <font color="#00ffff">/*</font><font color="#00ffff"> ...and then \[LU] </font><font color="#00ffff">*/</font>
+  <font color="#ffff00">if</font> (type == REPL_UPPERCASE)
+    <font color="#ffff00">for</font> (; start != end; start++)
+      *start = toupper(*start);
+  <font color="#ffff00">else</font>
+    <font color="#ffff00">for</font> (; start != end; start++)
+      *start = tolower(*start);
+<font color="#ff40ff">#endif</font>
+}
+
+<font color="#00ffff">/*</font><font color="#00ffff"> Initialize a &quot;struct line&quot; buffer.  Copy multibyte state from `state'</font>
+<font color="#00ffff">   if not null.  </font><font color="#00ffff">*/</font>
+<font color="#00ff00">static</font> <font color="#00ff00">void</font> line_init P_((<font color="#00ff00">struct</font> line *, <font color="#00ff00">struct</font> line *, <font color="#00ff00">size_t</font> initial_size));
+<font color="#00ff00">static</font> <font color="#00ff00">void</font>
+line_init(buf, state, initial_size)
+  <font color="#00ff00">struct</font> line *buf;
+  <font color="#00ff00">struct</font> line *state;
+  <font color="#00ff00">size_t</font> initial_size;
+{
+  buf-&gt;text = MALLOC(initial_size, <font color="#00ff00">char</font>);
+  buf-&gt;active = buf-&gt;text;
+  buf-&gt;alloc = initial_size;
+  buf-&gt;length = <font color="#ffff00">0</font>;
+  buf-&gt;chomped = <font color="#ffff00">true</font>;
+
+<font color="#ff40ff">#ifdef HAVE_MBRTOWC</font>
+  <font color="#ffff00">if</font> (state)
+    memcpy (&amp;buf-&gt;mbstate, &amp;state-&gt;mbstate, <font color="#ffff00">sizeof</font> (buf-&gt;mbstate));
+  <font color="#ffff00">else</font>
+    memset (&amp;buf-&gt;mbstate, <font color="#ffff00">0</font>, <font color="#ffff00">sizeof</font> (buf-&gt;mbstate));
+<font color="#ff40ff">#endif</font>
+}
+
+<font color="#00ffff">/*</font><font color="#00ffff"> Reset a &quot;struct line&quot; buffer to length zero.  Copy multibyte state from</font>
+<font color="#00ffff">   `state' if not null.  </font><font color="#00ffff">*/</font>
+<font color="#00ff00">static</font> <font color="#00ff00">void</font> line_reset P_((<font color="#00ff00">struct</font> line *, <font color="#00ff00">struct</font> line *));
+<font color="#00ff00">static</font> <font color="#00ff00">void</font>
+line_reset(buf, state)
+  <font color="#00ff00">struct</font> line *buf, *state;
+{
+  <font color="#ffff00">if</font> (buf-&gt;alloc == <font color="#ffff00">0</font>)
+    line_init(buf, state, INITIAL_BUFFER_SIZE);
+  <font color="#ffff00">else</font>
+    {
+      buf-&gt;length = <font color="#ffff00">0</font>;
+<font color="#ff40ff">#ifdef HAVE_MBRTOWC</font>
+      <font color="#ffff00">if</font> (state)
+        memcpy (&amp;buf-&gt;mbstate, &amp;state-&gt;mbstate, <font color="#ffff00">sizeof</font> (buf-&gt;mbstate));
+      <font color="#ffff00">else</font>
+        memset (&amp;buf-&gt;mbstate, <font color="#ffff00">0</font>, <font color="#ffff00">sizeof</font> (buf-&gt;mbstate));
+<font color="#ff40ff">#endif</font>
+    }
+}
+
+<font color="#00ffff">/*</font><font color="#00ffff"> Copy the contents of the line `from' into the line `to'.</font>
+<font color="#00ffff">   This destroys the old contents of `to'.</font>
+<font color="#00ffff">   Copy the multibyte state if `state' is true. </font><font color="#00ffff">*/</font>
+<font color="#00ff00">static</font> <font color="#00ff00">void</font> line_copy P_((<font color="#00ff00">struct</font> line *from, <font color="#00ff00">struct</font> line *to, <font color="#00ff00">int</font> state));
+<font color="#00ff00">static</font> <font color="#00ff00">void</font>
+line_copy(from, to, state)
+  <font color="#00ff00">struct</font> line *from;
+  <font color="#00ff00">struct</font> line *to;
+  <font color="#00ff00">int</font> state;
+{
+  <font color="#00ffff">/*</font><font color="#00ffff"> Remove the inactive portion in the destination buffer. </font><font color="#00ffff">*/</font>
+  to-&gt;alloc += to-&gt;active - to-&gt;text;
+
+  <font color="#ffff00">if</font> (to-&gt;alloc &lt; from-&gt;length)
+    {
+      to-&gt;alloc *= <font color="#ffff00">2</font>;
+      <font color="#ffff00">if</font> (to-&gt;alloc &lt; from-&gt;length)
+    to-&gt;alloc = from-&gt;length;
+      <font color="#ffff00">if</font> (to-&gt;alloc &lt; INITIAL_BUFFER_SIZE)
+    to-&gt;alloc = INITIAL_BUFFER_SIZE;
+      <font color="#00ffff">/*</font><font color="#00ffff"> Use FREE()+MALLOC() instead of REALLOC() to</font>
+<font color="#00ffff">     avoid unnecessary copying of old text. </font><font color="#00ffff">*/</font>
+      FREE(to-&gt;text);
+      to-&gt;text = MALLOC(to-&gt;alloc, <font color="#00ff00">char</font>);
+    }
+
+  to-&gt;active = to-&gt;text;
+  to-&gt;length = from-&gt;length;
+  to-&gt;chomped = from-&gt;chomped;
+  MEMCPY(to-&gt;active, from-&gt;active, from-&gt;length);
+
+<font color="#ff40ff">#ifdef HAVE_MBRTOWC</font>
+  <font color="#ffff00">if</font> (state)
+    MEMCPY(&amp;to-&gt;mbstate, &amp;from-&gt;mbstate, <font color="#ffff00">sizeof</font> (from-&gt;mbstate));
+<font color="#ff40ff">#endif</font>
+}
+
+<font color="#00ffff">/*</font><font color="#00ffff"> Append the contents of the line `from' to the line `to'.</font>
+<font color="#00ffff">   Copy the multibyte state if `state' is true. </font><font color="#00ffff">*/</font>
+<font color="#00ff00">static</font> <font color="#00ff00">void</font> line_append P_((<font color="#00ff00">struct</font> line *from, <font color="#00ff00">struct</font> line *to, <font color="#00ff00">int</font> state));
+<font color="#00ff00">static</font> <font color="#00ff00">void</font>
+line_append(from, to, state)
+  <font color="#00ff00">struct</font> line *from;
+  <font color="#00ff00">struct</font> line *to;
+  <font color="#00ff00">int</font> state;
+{
+  str_append(to, <font color="#ffff00">&quot;</font><font color="#ff40ff">\n</font><font color="#ffff00">&quot;</font>, <font color="#ffff00">1</font>);
+  str_append(to, from-&gt;active, from-&gt;length);
+  to-&gt;chomped = from-&gt;chomped;
+
+<font color="#ff40ff">#ifdef HAVE_MBRTOWC</font>
+  <font color="#ffff00">if</font> (state)
+    MEMCPY (&amp;to-&gt;mbstate, &amp;from-&gt;mbstate, <font color="#ffff00">sizeof</font> (from-&gt;mbstate));
+<font color="#ff40ff">#endif</font>
+}
+
+<font color="#00ffff">/*</font><font color="#00ffff"> Exchange two &quot;struct line&quot; buffers.</font>
+<font color="#00ffff">   Copy the multibyte state if `state' is true. </font><font color="#00ffff">*/</font>
+<font color="#00ff00">static</font> <font color="#00ff00">void</font> line_exchange P_((<font color="#00ff00">struct</font> line *a, <font color="#00ff00">struct</font> line *b, <font color="#00ff00">int</font> state));
+<font color="#00ff00">static</font> <font color="#00ff00">void</font>
+line_exchange(a, b, state)
+  <font color="#00ff00">struct</font> line *a;
+  <font color="#00ff00">struct</font> line *b;
+  <font color="#00ff00">int</font> state;
+{
+  <font color="#00ff00">struct</font> line t;
+
+  <font color="#ffff00">if</font> (state)
+    {
+      MEMCPY(&amp;t,  a, <font color="#ffff00">sizeof</font> (<font color="#00ff00">struct</font> line));
+      MEMCPY( a,  b, <font color="#ffff00">sizeof</font> (<font color="#00ff00">struct</font> line));
+      MEMCPY( b, &amp;t, <font color="#ffff00">sizeof</font> (<font color="#00ff00">struct</font> line));
+    }
+  <font color="#ffff00">else</font>
+    {
+      MEMCPY(&amp;t,  a, SIZEOF_LINE);
+      MEMCPY( a,  b, SIZEOF_LINE);
+      MEMCPY( b, &amp;t, SIZEOF_LINE);
+    }
+}
+
+<span class=""><hr class="PAGE-BREAK"></span>
+<font color="#00ffff">/*</font><font color="#00ffff"> dummy function to simplify read_pattern_space() </font><font color="#00ffff">*/</font>
+<font color="#00ff00">static</font> <font color="#00ff00">bool</font> read_always_fail P_((<font color="#00ff00">struct</font> input *));
+<font color="#00ff00">static</font> <font color="#00ff00">bool</font>
+read_always_fail(input)
+  <font color="#00ff00">struct</font> input *input UNUSED;
+{
+  <font color="#ffff00">return</font> <font color="#ffff00">false</font>;
+}
+
+<font color="#00ff00">static</font> <font color="#00ff00">bool</font> read_file_line P_((<font color="#00ff00">struct</font> input *));
+<font color="#00ff00">static</font> <font color="#00ff00">bool</font>
+read_file_line(input)
+  <font color="#00ff00">struct</font> input *input;
+{
+  <font color="#00ff00">static</font> <font color="#00ff00">char</font> *b;
+  <font color="#00ff00">static</font> <font color="#00ff00">size_t</font> blen;
+
+  <font color="#00ff00">long</font> result = ck_getline (&amp;b, &amp;blen, input-&gt;fp);
+  <font color="#ffff00">if</font> (result &lt;= <font color="#ffff00">0</font>)
+    <font color="#ffff00">return</font> <font color="#ffff00">false</font>;
+
+  <font color="#00ffff">/*</font><font color="#00ffff"> Remove the trailing new-line that is left by getline. </font><font color="#00ffff">*/</font>
+  <font color="#ffff00">if</font> (b[result - <font color="#ffff00">1</font>] == <font color="#ff40ff">'\n'</font>)
+    --result;
+  <font color="#ffff00">else</font>
+    line.chomped = <font color="#ffff00">false</font>;
+
+  str_append(&amp;line, b, result);
+  <font color="#ffff00">return</font> <font color="#ffff00">true</font>;
+}
+
+<span class=""><hr class="PAGE-BREAK"></span>
+<font color="#00ff00">static</font> <font color="#00ff00">inline</font> <font color="#00ff00">void</font> output_missing_newline P_((<font color="#00ff00">struct</font> output *));
+<font color="#00ff00">static</font> <font color="#00ff00">inline</font> <font color="#00ff00">void</font>
+output_missing_newline(outf)
+  <font color="#00ff00">struct</font> output *outf;
+{
+  <font color="#ffff00">if</font> (outf-&gt;missing_newline)
+    {
+      ck_fwrite(<font color="#ffff00">&quot;</font><font color="#ff40ff">\n</font><font color="#ffff00">&quot;</font>, <font color="#ffff00">1</font>, <font color="#ffff00">1</font>, outf-&gt;fp);
+      outf-&gt;missing_newline = <font color="#ffff00">false</font>;
+    }
+}
+
+<font color="#00ff00">static</font> <font color="#00ff00">inline</font> <font color="#00ff00">void</font> flush_output P_((<font color="#00ff00">FILE</font> *));
+<font color="#00ff00">static</font> <font color="#00ff00">inline</font> <font color="#00ff00">void</font>
+flush_output(fp)
+  <font color="#00ff00">FILE</font> *fp;
+{
+  <font color="#ffff00">if</font> (fp != <font color="#ffff00">stdout</font> || unbuffered_output)
+    ck_fflush(fp);
+}
+
+<font color="#00ff00">static</font> <font color="#00ff00">void</font> output_line P_((<font color="#00ff00">const</font> <font color="#00ff00">char</font> *, <font color="#00ff00">size_t</font>, <font color="#00ff00">int</font>, <font color="#00ff00">struct</font> output *));
+<font color="#00ff00">static</font> <font color="#00ff00">void</font>
+output_line(text, length, nl, outf)
+  <font color="#00ff00">const</font> <font color="#00ff00">char</font> *text;
+  <font color="#00ff00">size_t</font> length;
+  <font color="#00ff00">int</font> nl;
+  <font color="#00ff00">struct</font> output *outf;
+{
+  <font color="#ffff00">if</font> (!text)
+    <font color="#ffff00">return</font>;
+
+  output_missing_newline(outf);
+  <font color="#ffff00">if</font> (length)
+    ck_fwrite(text, <font color="#ffff00">1</font>, length, outf-&gt;fp);
+  <font color="#ffff00">if</font> (nl)
+    ck_fwrite(<font color="#ffff00">&quot;</font><font color="#ff40ff">\n</font><font color="#ffff00">&quot;</font>, <font color="#ffff00">1</font>, <font color="#ffff00">1</font>, outf-&gt;fp);
+  <font color="#ffff00">else</font>
+    outf-&gt;missing_newline = <font color="#ffff00">true</font>;
+
+  flush_output(outf-&gt;fp);
+}
+
+<font color="#00ff00">static</font> <font color="#00ff00">struct</font> append_queue *next_append_slot P_((<font color="#00ff00">void</font>));
+<font color="#00ff00">static</font> <font color="#00ff00">struct</font> append_queue *
+next_append_slot()
+{
+  <font color="#00ff00">struct</font> append_queue *n = MALLOC(<font color="#ffff00">1</font>, <font color="#00ff00">struct</font> append_queue);
+
+  n-&gt;fname = <font color="#ffff00">NULL</font>;
+  n-&gt;text = <font color="#ffff00">NULL</font>;
+  n-&gt;textlen = <font color="#ffff00">0</font>;
+  n-&gt;next = <font color="#ffff00">NULL</font>;
+  n-&gt;free = <font color="#ffff00">false</font>;
+
+  <font color="#ffff00">if</font> (append_tail)
+      append_tail-&gt;next = n;
+  <font color="#ffff00">else</font>
+      append_head = n;
+  <font color="#ffff00">return</font> append_tail = n;
+}
+
+<font color="#00ff00">static</font> <font color="#00ff00">void</font> release_append_queue P_((<font color="#00ff00">void</font>));
+<font color="#00ff00">static</font> <font color="#00ff00">void</font>
+release_append_queue()
+{
+  <font color="#00ff00">struct</font> append_queue *p, *q;
+
+  <font color="#ffff00">for</font> (p=append_head; p; p=q)
+    {
+      <font color="#ffff00">if</font> (p-&gt;free)
+        FREE(p-&gt;text);
+
+      q = p-&gt;next;
+      FREE(p);
+    }
+  append_head = append_tail = <font color="#ffff00">NULL</font>;
+}
+
+<font color="#00ff00">static</font> <font color="#00ff00">void</font> dump_append_queue P_((<font color="#00ff00">void</font>));
+<font color="#00ff00">static</font> <font color="#00ff00">void</font>
+dump_append_queue()
+{
+  <font color="#00ff00">struct</font> append_queue *p;
+
+  output_missing_newline(&amp;output_file);
+  <font color="#ffff00">for</font> (p=append_head; p; p=p-&gt;next)
+    {
+      <font color="#ffff00">if</font> (p-&gt;text)
+        ck_fwrite(p-&gt;text, <font color="#ffff00">1</font>, p-&gt;textlen, output_file.fp);
+
+      <font color="#ffff00">if</font> (p-&gt;fname)
+    {
+      <font color="#00ff00">char</font> buf[FREAD_BUFFER_SIZE];
+      <font color="#00ff00">size_t</font> cnt;
+      <font color="#00ff00">FILE</font> *fp;
+
+      <font color="#00ffff">/*</font><font color="#00ffff"> &quot;If _fname_ does not exist or cannot be read, it shall</font>
+<font color="#00ffff">         be treated as if it were an empty file, causing no error</font>
+<font color="#00ffff">         condition.&quot;  IEEE Std 1003.2-1992</font>
+<font color="#00ffff">         So, don't fail. </font><font color="#00ffff">*/</font>
+      fp = ck_fopen(p-&gt;fname, read_mode, <font color="#ffff00">false</font>);
+      <font color="#ffff00">if</font> (fp)
+        {
+          <font color="#ffff00">while</font> ((cnt = ck_fread(buf, <font color="#ffff00">1</font>, <font color="#ffff00">sizeof</font> buf, fp)) &gt; <font color="#ffff00">0</font>)
+        ck_fwrite(buf, <font color="#ffff00">1</font>, cnt, output_file.fp);
+          ck_fclose(fp);
+        }
+    }
+    }
+
+  flush_output(output_file.fp);
+  release_append_queue();
+}
+
+<span class=""><hr class="PAGE-BREAK"></span>
+<font color="#00ffff">/*</font><font color="#00ffff"> Compute the name of the backup file for in-place editing </font><font color="#00ffff">*/</font>
+<font color="#00ff00">static</font> <font color="#00ff00">char</font> *get_backup_file_name P_((<font color="#00ff00">const</font> <font color="#00ff00">char</font> *));
+<font color="#00ff00">static</font> <font color="#00ff00">char</font> *
+get_backup_file_name(name)
+  <font color="#00ff00">const</font> <font color="#00ff00">char</font> *name;
+{
+  <font color="#00ff00">char</font> *old_asterisk, *asterisk, *backup, *p;
+  <font color="#00ff00">int</font> name_length = strlen(name), backup_length = strlen(in_place_extension);
+
+  <font color="#00ffff">/*</font><font color="#00ffff"> Compute the length of the backup file </font><font color="#00ffff">*/</font>
+  <font color="#ffff00">for</font> (asterisk = in_place_extension - <font color="#ffff00">1</font>, old_asterisk = asterisk + <font color="#ffff00">1</font>;
+       (asterisk = strchr(old_asterisk, <font color="#ffff00">'*'</font>));
+       old_asterisk = asterisk + <font color="#ffff00">1</font>)
+    backup_length += name_length - <font color="#ffff00">1</font>;
+
+  p = backup = xmalloc(backup_length + <font color="#ffff00">1</font>);
+
+  <font color="#00ffff">/*</font><font color="#00ffff"> Each iteration gobbles up to an asterisk </font><font color="#00ffff">*/</font>
+  <font color="#ffff00">for</font> (asterisk = in_place_extension - <font color="#ffff00">1</font>, old_asterisk = asterisk + <font color="#ffff00">1</font>;
+       (asterisk = strchr(old_asterisk, <font color="#ffff00">'*'</font>));
+       old_asterisk = asterisk + <font color="#ffff00">1</font>)
+    {
+      MEMCPY (p, old_asterisk, asterisk - old_asterisk);
+      p += asterisk - old_asterisk;
+      strcpy (p, name);
+      p += name_length;
+    }
+
+  <font color="#00ffff">/*</font><font color="#00ffff"> Tack on what's after the last asterisk </font><font color="#00ffff">*/</font>
+  strcpy (p, old_asterisk);
+  <font color="#ffff00">return</font> backup;
+}
+
+<font color="#00ffff">/*</font><font color="#00ffff"> Initialize a struct input for the named file. </font><font color="#00ffff">*/</font>
+<font color="#00ff00">static</font> <font color="#00ff00">void</font> open_next_file P_((<font color="#00ff00">const</font> <font color="#00ff00">char</font> *name, <font color="#00ff00">struct</font> input *));
+<font color="#00ff00">static</font> <font color="#00ff00">void</font>
+open_next_file(name, input)
+  <font color="#00ff00">const</font> <font color="#00ff00">char</font> *name;
+  <font color="#00ff00">struct</font> input *input;
+{
+  buffer.length = <font color="#ffff00">0</font>;
+
+  <font color="#ffff00">if</font> (name[<font color="#ffff00">0</font>] == <font color="#ffff00">'-'</font> &amp;&amp; name[<font color="#ffff00">1</font>] == <font color="#ff40ff">'\0'</font> &amp;&amp; !in_place_extension)
+    {
+      clearerr(<font color="#ffff00">stdin</font>);  <font color="#00ffff">/*</font><font color="#00ffff"> clear any stale EOF indication </font><font color="#00ffff">*/</font>
+      input-&gt;fp = ck_fdopen (fileno (<font color="#ffff00">stdin</font>), <font color="#ffff00">&quot;stdin&quot;</font>, read_mode, <font color="#ffff00">false</font>);
+    }
+  <font color="#ffff00">else</font> <font color="#ffff00">if</font> ( ! (input-&gt;fp = ck_fopen(name, read_mode, <font color="#ffff00">false</font>)) )
+    {
+      <font color="#00ff00">const</font> <font color="#00ff00">char</font> *ptr = strerror(errno);
+      fprintf(<font color="#ffff00">stderr</font>, _(<font color="#ffff00">&quot;</font><font color="#ff40ff">%s</font><font color="#ffff00">: can't read </font><font color="#ff40ff">%s</font><font color="#ffff00">: </font><font color="#ff40ff">%s</font><font color="#ff40ff">\n</font><font color="#ffff00">&quot;</font>), myname, name, ptr);
+      input-&gt;read_fn = read_always_fail; <font color="#00ffff">/*</font><font color="#00ffff"> a redundancy </font><font color="#00ffff">*/</font>
+      ++input-&gt;bad_count;
+      <font color="#ffff00">return</font>;
+    }
+
+  input-&gt;read_fn = read_file_line;
+
+  <font color="#ffff00">if</font> (in_place_extension)
+    {
+      <font color="#00ff00">int</font> input_fd, output_fd;
+      <font color="#00ff00">char</font> *tmpdir, *p;
+      <font color="#00ff00">struct</font> stat st;
+
+      <font color="#ffff00">if</font> (follow_symlinks)
+    input-&gt;in_file_name = follow_symlink (name);
+      <font color="#ffff00">else</font>
+        input-&gt;in_file_name = name;
+
+      <font color="#00ffff">/*</font><font color="#00ffff"> get the base name </font><font color="#00ffff">*/</font>
+      tmpdir = ck_strdup(input-&gt;in_file_name);
+      <font color="#ffff00">if</font> ((p = strrchr(tmpdir, <font color="#ffff00">'/'</font>)))
+    *(p + <font color="#ffff00">1</font>) = <font color="#ffff00">0</font>;
+      <font color="#ffff00">else</font>
+    strcpy(tmpdir, <font color="#ffff00">&quot;.&quot;</font>);
+
+      <font color="#ffff00">if</font> (isatty (fileno (input-&gt;fp)))
+        panic(_(<font color="#ffff00">&quot;couldn't edit </font><font color="#ff40ff">%s</font><font color="#ffff00">: is a terminal&quot;</font>), input-&gt;in_file_name);
+
+      input_fd = fileno (input-&gt;fp);
+      fstat (input_fd, &amp;st);
+      <font color="#ffff00">if</font> (!S_ISREG (st.st_mode))
+        panic(_(<font color="#ffff00">&quot;couldn't edit </font><font color="#ff40ff">%s</font><font color="#ffff00">: not a regular file&quot;</font>), input-&gt;in_file_name);
+
+      output_file.fp = ck_mkstemp (&amp;input-&gt;out_file_name, tmpdir, <font color="#ffff00">&quot;sed&quot;</font>);
+      output_file.missing_newline = <font color="#ffff00">false</font>;
+      free (tmpdir);
+
+      <font color="#ffff00">if</font> (!output_file.fp)
+        panic(_(<font color="#ffff00">&quot;couldn't open temporary file </font><font color="#ff40ff">%s</font><font color="#ffff00">: </font><font color="#ff40ff">%s</font><font color="#ffff00">&quot;</font>), input-&gt;out_file_name, strerror(errno));
+
+      output_fd = fileno (output_file.fp);
+<font color="#ff40ff">#ifdef HAVE_FCHOWN</font>
+      <font color="#ffff00">if</font> (fchown (output_fd, st.st_uid, st.st_gid) == -<font color="#ffff00">1</font>)
+        fchown (output_fd, -<font color="#ffff00">1</font>, st.st_gid);
+<font color="#ff40ff">#endif</font>
+      copy_acl (input-&gt;in_file_name, input_fd,
+        input-&gt;out_file_name, output_fd,
+        st.st_mode);
+    }
+  <font color="#ffff00">else</font>
+    output_file.fp = <font color="#ffff00">stdout</font>;
+}
+
+
+<font color="#00ffff">/*</font><font color="#00ffff"> Clean up an input stream that we are done with. </font><font color="#00ffff">*/</font>
+<font color="#00ff00">static</font> <font color="#00ff00">void</font> closedown P_((<font color="#00ff00">struct</font> input *));
+<font color="#00ff00">static</font> <font color="#00ff00">void</font>
+closedown(input)
+  <font color="#00ff00">struct</font> input *input;
+{
+  input-&gt;read_fn = read_always_fail;
+  <font color="#ffff00">if</font> (!input-&gt;fp)
+    <font color="#ffff00">return</font>;
+
+  <font color="#ffff00">if</font> (in_place_extension &amp;&amp; output_file.fp != <font color="#ffff00">NULL</font>)
+    {
+      <font color="#00ff00">const</font> <font color="#00ff00">char</font> *target_name;
+      ck_fclose (output_file.fp);
+
+      target_name = input-&gt;in_file_name;
+      <font color="#ffff00">if</font> (strcmp(in_place_extension, <font color="#ffff00">&quot;*&quot;</font>) != <font color="#ffff00">0</font>)
+        {
+          <font color="#00ff00">char</font> *backup_file_name = get_backup_file_name(target_name);
+      ck_rename (target_name, backup_file_name, input-&gt;out_file_name);
+          free (backup_file_name);
+    }
+
+      ck_rename (input-&gt;out_file_name, target_name, input-&gt;out_file_name);
+      free (input-&gt;out_file_name);
+    }
+
+  ck_fclose (input-&gt;fp);
+  input-&gt;fp = <font color="#ffff00">NULL</font>;
+}
+
+<font color="#00ffff">/*</font><font color="#00ffff"> Reset range commands so that they are marked as non-matching </font><font color="#00ffff">*/</font>
+<font color="#00ff00">static</font> <font color="#00ff00">void</font> reset_addresses P_((<font color="#00ff00">struct</font> vector *));
+<font color="#00ff00">static</font> <font color="#00ff00">void</font>
+reset_addresses(vec)
+     <font color="#00ff00">struct</font> vector *vec;
+{
+  <font color="#00ff00">struct</font> sed_cmd *cur_cmd;
+  <font color="#00ff00">int</font> n;
+
+  <font color="#ffff00">for</font> (cur_cmd = vec-&gt;v, n = vec-&gt;v_length; n--; cur_cmd++)
+    <font color="#ffff00">if</font> (cur_cmd-&gt;a1
+    &amp;&amp; cur_cmd-&gt;a1-&gt;addr_type == ADDR_IS_NUM
+    &amp;&amp; cur_cmd-&gt;a1-&gt;addr_number == <font color="#ffff00">0</font>)
+      cur_cmd-&gt;range_state = RANGE_ACTIVE;
+    <font color="#ffff00">else</font>
+      cur_cmd-&gt;range_state = RANGE_INACTIVE;
+}
+
+<font color="#00ffff">/*</font><font color="#00ffff"> Read in the next line of input, and store it in the pattern space.</font>
+<font color="#00ffff">   Return zero if there is nothing left to input. </font><font color="#00ffff">*/</font>
+<font color="#00ff00">static</font> <font color="#00ff00">bool</font> read_pattern_space P_((<font color="#00ff00">struct</font> input *, <font color="#00ff00">struct</font> vector *, <font color="#00ff00">int</font>));
+<font color="#00ff00">static</font> <font color="#00ff00">bool</font>
+read_pattern_space(input, the_program, append)
+  <font color="#00ff00">struct</font> input *input;
+  <font color="#00ff00">struct</font> vector *the_program;
+  <font color="#00ff00">int</font> append;
+{
+  <font color="#ffff00">if</font> (append_head) <font color="#00ffff">/*</font><font color="#00ffff"> redundant test to optimize for common case </font><font color="#00ffff">*/</font>
+    dump_append_queue();
+  replaced = <font color="#ffff00">false</font>;
+  <font color="#ffff00">if</font> (!append)
+    line.length = <font color="#ffff00">0</font>;
+  line.chomped = <font color="#ffff00">true</font>;  <font color="#00ffff">/*</font><font color="#00ffff"> default, until proved otherwise </font><font color="#00ffff">*/</font>
+
+  <font color="#ffff00">while</font> ( ! (*input-&gt;read_fn)(input) )
+    {
+      closedown(input);
+
+      <font color="#ffff00">if</font> (!*input-&gt;file_list)
+    <font color="#ffff00">return</font> <font color="#ffff00">false</font>;
+
+      <font color="#ffff00">if</font> (input-&gt;reset_at_next_file)
+    {
+      input-&gt;line_number = <font color="#ffff00">0</font>;
+      hold.length = <font color="#ffff00">0</font>;
+      reset_addresses (the_program);
+      rewind_read_files ();
+
+      <font color="#00ffff">/*</font><font color="#00ffff"> If doing in-place editing, we will never append the</font>
+<font color="#00ffff">         new-line to this file; but if the output goes to stdout,</font>
+<font color="#00ffff">         we might still have to output the missing new-line.  </font><font color="#00ffff">*/</font>
+      <font color="#ffff00">if</font> (in_place_extension)
+        output_file.missing_newline = <font color="#ffff00">false</font>;
+
+      input-&gt;reset_at_next_file = separate_files;
+    }
+
+      open_next_file (*input-&gt;file_list++, input);
+    }
+
+  ++input-&gt;line_number;
+  <font color="#ffff00">return</font> <font color="#ffff00">true</font>;
+}
+
+<span class=""><hr class="PAGE-BREAK"></span>
+<font color="#00ff00">static</font> <font color="#00ff00">bool</font> last_file_with_data_p P_((<font color="#00ff00">struct</font> input *));
+<font color="#00ff00">static</font> <font color="#00ff00">bool</font>
+last_file_with_data_p(input)
+  <font color="#00ff00">struct</font> input *input;
+{
+  <font color="#ffff00">for</font> (;;)
+    {
+      <font color="#00ff00">int</font> ch;
+
+      closedown(input);
+      <font color="#ffff00">if</font> (!*input-&gt;file_list)
+    <font color="#ffff00">return</font> <font color="#ffff00">true</font>;
+      open_next_file(*input-&gt;file_list++, input);
+      <font color="#ffff00">if</font> (input-&gt;fp)
+    {
+      <font color="#ffff00">if</font> ((ch = getc(input-&gt;fp)) != <font color="#ffff00">EOF</font>)
+        {
+          ungetc(ch, input-&gt;fp);
+          <font color="#ffff00">return</font> <font color="#ffff00">false</font>;
+        }
+    }
+    }
+}
+
+<font color="#00ffff">/*</font><font color="#00ffff"> Determine if we match the `$' address. </font><font color="#00ffff">*/</font>
+<font color="#00ff00">static</font> <font color="#00ff00">bool</font> test_eof P_((<font color="#00ff00">struct</font> input *));
+<font color="#00ff00">static</font> <font color="#00ff00">bool</font>
+test_eof(input)
+  <font color="#00ff00">struct</font> input *input;
+{
+  <font color="#00ff00">int</font> ch;
+
+  <font color="#ffff00">if</font> (buffer.length)
+    <font color="#ffff00">return</font> <font color="#ffff00">false</font>;
+  <font color="#ffff00">if</font> (!input-&gt;fp)
+    <font color="#ffff00">return</font> separate_files || last_file_with_data_p(input);
+  <font color="#ffff00">if</font> (feof(input-&gt;fp))
+    <font color="#ffff00">return</font> separate_files || last_file_with_data_p(input);
+  <font color="#ffff00">if</font> ((ch = getc(input-&gt;fp)) == <font color="#ffff00">EOF</font>)
+    <font color="#ffff00">return</font> separate_files || last_file_with_data_p(input);
+  ungetc(ch, input-&gt;fp);
+  <font color="#ffff00">return</font> <font color="#ffff00">false</font>;
+}
+
+<font color="#00ffff">/*</font><font color="#00ffff"> Return non-zero if the current line matches the address</font>
+<font color="#00ffff">   pointed to by `addr'. </font><font color="#00ffff">*/</font>
+<font color="#00ff00">static</font> <font color="#00ff00">bool</font> match_an_address_p P_((<font color="#00ff00">struct</font> addr *, <font color="#00ff00">struct</font> input *));
+<font color="#00ff00">static</font> <font color="#00ff00">bool</font>
+match_an_address_p(addr, input)
+  <font color="#00ff00">struct</font> addr *addr;
+  <font color="#00ff00">struct</font> input *input;
+{
+  <font color="#ffff00">switch</font> (addr-&gt;addr_type)
+    {
+    <font color="#ffff00">case</font> ADDR_IS_NULL:
+      <font color="#ffff00">return</font> <font color="#ffff00">true</font>;
+
+    <font color="#ffff00">case</font> ADDR_IS_REGEX:
+      <font color="#ffff00">return</font> match_regex(addr-&gt;addr_regex, line.active, line.length, <font color="#ffff00">0</font>, <font color="#ffff00">NULL</font>, <font color="#ffff00">0</font>);
+
+    <font color="#ffff00">case</font> ADDR_IS_NUM_MOD:
+      <font color="#ffff00">return</font> (input-&gt;line_number &gt;= addr-&gt;addr_number
+          &amp;&amp; ((input-&gt;line_number - addr-&gt;addr_number) % addr-&gt;addr_step) == <font color="#ffff00">0</font>);
+
+    <font color="#ffff00">case</font> ADDR_IS_STEP:
+    <font color="#ffff00">case</font> ADDR_IS_STEP_MOD:
+      <font color="#00ffff">/*</font><font color="#00ffff"> reminder: these are only meaningful for a2 addresses </font><font color="#00ffff">*/</font>
+      <font color="#00ffff">/*</font><font color="#00ffff"> a2-&gt;addr_number needs to be recomputed each time a1 address</font>
+<font color="#00ffff">         matches for the step and step_mod types </font><font color="#00ffff">*/</font>
+      <font color="#ffff00">return</font> (addr-&gt;addr_number &lt;= input-&gt;line_number);
+
+    <font color="#ffff00">case</font> ADDR_IS_LAST:
+      <font color="#ffff00">return</font> test_eof(input);
+
+      <font color="#00ffff">/*</font><font color="#00ffff"> ADDR_IS_NUM is handled in match_address_p.  </font><font color="#00ffff">*/</font>
+    <font color="#ffff00">case</font> ADDR_IS_NUM:
+    <font color="#ffff00">default</font>:
+      panic(<font color="#ffff00">&quot;INTERNAL ERROR: bad address type&quot;</font>);
+    }
+  <font color="#00ffff">/*</font><font color="#00ffff">NOTREACHED</font><font color="#00ffff">*/</font>
+  <font color="#ffff00">return</font> <font color="#ffff00">false</font>;
+}
+
+<font color="#00ffff">/*</font><font color="#00ffff"> return non-zero if current address is valid for cmd </font><font color="#00ffff">*/</font>
+<font color="#00ff00">static</font> <font color="#00ff00">bool</font> match_address_p P_((<font color="#00ff00">struct</font> sed_cmd *, <font color="#00ff00">struct</font> input *));
+<font color="#00ff00">static</font> <font color="#00ff00">bool</font>
+match_address_p(cmd, input)
+  <font color="#00ff00">struct</font> sed_cmd *cmd;
+  <font color="#00ff00">struct</font> input *input;
+{
+  <font color="#ffff00">if</font> (!cmd-&gt;a1)
+    <font color="#ffff00">return</font> <font color="#ffff00">true</font>;
+
+  <font color="#ffff00">if</font> (cmd-&gt;range_state != RANGE_ACTIVE)
+    {
+      <font color="#00ffff">/*</font><font color="#00ffff"> Find if we are going to activate a range.  Handle ADDR_IS_NUM</font>
+<font color="#00ffff">     specially: it represent an &quot;absolute&quot; state, it should not</font>
+<font color="#00ffff">     be computed like regexes.  </font><font color="#00ffff">*/</font>
+      <font color="#ffff00">if</font> (cmd-&gt;a1-&gt;addr_type == ADDR_IS_NUM)
+    {
+      <font color="#ffff00">if</font> (!cmd-&gt;a2)
+        <font color="#ffff00">return</font> (input-&gt;line_number == cmd-&gt;a1-&gt;addr_number);
+
+      <font color="#ffff00">if</font> (cmd-&gt;range_state == RANGE_CLOSED
+          || input-&gt;line_number &lt; cmd-&gt;a1-&gt;addr_number)
+        <font color="#ffff00">return</font> <font color="#ffff00">false</font>;
+    }
+      <font color="#ffff00">else</font>
+    {
+          <font color="#ffff00">if</font> (!cmd-&gt;a2)
+        <font color="#ffff00">return</font> match_an_address_p(cmd-&gt;a1, input);
+
+      <font color="#ffff00">if</font> (!match_an_address_p(cmd-&gt;a1, input))
+            <font color="#ffff00">return</font> <font color="#ffff00">false</font>;
+    }
+
+      <font color="#00ffff">/*</font><font color="#00ffff"> Ok, start a new range.  </font><font color="#00ffff">*/</font>
+      cmd-&gt;range_state = RANGE_ACTIVE;
+      <font color="#ffff00">switch</font> (cmd-&gt;a2-&gt;addr_type)
+    {
+    <font color="#ffff00">case</font> ADDR_IS_REGEX:
+      <font color="#00ffff">/*</font><font color="#00ffff"> Always include at least two lines.  </font><font color="#00ffff">*/</font>
+      <font color="#ffff00">return</font> <font color="#ffff00">true</font>;
+    <font color="#ffff00">case</font> ADDR_IS_NUM:
+      <font color="#00ffff">/*</font><font color="#00ffff"> Same handling as below, but always include at least one line.  </font><font color="#00ffff">*/</font>
+          <font color="#ffff00">if</font> (input-&gt;line_number &gt;= cmd-&gt;a2-&gt;addr_number)
+        cmd-&gt;range_state = RANGE_CLOSED;
+          <font color="#ffff00">return</font> <font color="#ffff00">true</font>;
+    <font color="#ffff00">case</font> ADDR_IS_STEP:
+      cmd-&gt;a2-&gt;addr_number = input-&gt;line_number + cmd-&gt;a2-&gt;addr_step;
+      <font color="#ffff00">return</font> <font color="#ffff00">true</font>;
+    <font color="#ffff00">case</font> ADDR_IS_STEP_MOD:
+      cmd-&gt;a2-&gt;addr_number = input-&gt;line_number + cmd-&gt;a2-&gt;addr_step
+                 - (input-&gt;line_number%cmd-&gt;a2-&gt;addr_step);
+      <font color="#ffff00">return</font> <font color="#ffff00">true</font>;
+    <font color="#ffff00">default</font>:
+      <font color="#ffff00">break</font>;
+        }
+    }
+
+  <font color="#00ffff">/*</font><font color="#00ffff"> cmd-&gt;range_state == RANGE_ACTIVE.  Check if the range is</font>
+<font color="#00ffff">     ending; also handle ADDR_IS_NUM specially in this case.  </font><font color="#00ffff">*/</font>
+
+  <font color="#ffff00">if</font> (cmd-&gt;a2-&gt;addr_type == ADDR_IS_NUM)
+    {
+      <font color="#00ffff">/*</font><font color="#00ffff"> If the second address is a line number, and if we got past</font>
+<font color="#00ffff">         that line, fail to match (it can happen when you jump</font>
+<font color="#00ffff">     over such addresses with `b' and `t'.  Use RANGE_CLOSED</font>
+<font color="#00ffff">         so that the range is not re-enabled anymore.  </font><font color="#00ffff">*/</font>
+      <font color="#ffff00">if</font> (input-&gt;line_number &gt;= cmd-&gt;a2-&gt;addr_number)
+    cmd-&gt;range_state = RANGE_CLOSED;
+
+      <font color="#ffff00">return</font> (input-&gt;line_number &lt;= cmd-&gt;a2-&gt;addr_number);
+   }
+
+  <font color="#00ffff">/*</font><font color="#00ffff"> Other addresses are treated as usual.  </font><font color="#00ffff">*/</font>
+  <font color="#ffff00">if</font> (match_an_address_p(cmd-&gt;a2, input))
+    cmd-&gt;range_state = RANGE_CLOSED;
+
+  <font color="#ffff00">return</font> <font color="#ffff00">true</font>;
+}
+
+<span class=""><hr class="PAGE-BREAK"></span>
+<font color="#00ff00">static</font> <font color="#00ff00">void</font> do_list P_((<font color="#00ff00">int</font> line_len));
+<font color="#00ff00">static</font> <font color="#00ff00">void</font>
+do_list(line_len)
+     <font color="#00ff00">int</font> line_len;
+{
+  <font color="#00ff00">unsigned</font> <font color="#00ff00">char</font> *p = CAST(<font color="#00ff00">unsigned</font> <font color="#00ff00">char</font> *)line.active;
+  countT len = line.length;
+  countT width = <font color="#ffff00">0</font>;
+  <font color="#00ff00">char</font> obuf[<font color="#ffff00">180</font>];   <font color="#00ffff">/*</font><font color="#00ffff"> just in case we encounter a 512-bit char (;-) </font><font color="#00ffff">*/</font>
+  <font color="#00ff00">char</font> *o;
+  <font color="#00ff00">size_t</font> olen;
+  <font color="#00ff00">FILE</font> *fp = output_file.fp;
+
+  output_missing_newline(&amp;output_file);
+  <font color="#ffff00">for</font> (; len--; ++p) {
+      o = obuf;
+
+      <font color="#00ffff">/*</font><font color="#00ffff"> Some locales define 8-bit characters as printable.  This makes the</font>
+<font color="#00ffff">     testsuite fail at 8to7.sed because the `l' command in fact will not</font>
+<font color="#00ffff">     convert the 8-bit characters. </font><font color="#00ffff">*/</font>
+<font color="#ff40ff">#if defined isascii || defined HAVE_ISASCII</font>
+      <font color="#ffff00">if</font> (isascii(*p) &amp;&amp; ISPRINT(*p)) {
+<font color="#ff40ff">#else</font>
+      <font color="#ffff00">if</font> (ISPRINT(*p)) {
+<font color="#ff40ff">#endif</font>
+      *o++ = *p;
+      <font color="#ffff00">if</font> (*p == <font color="#ff40ff">'\\'</font>)
+        *o++ = <font color="#ff40ff">'\\'</font>;
+      } <font color="#ffff00">else</font> {
+      *o++ = <font color="#ff40ff">'\\'</font>;
+      <font color="#ffff00">switch</font> (*p) {
+<font color="#ff40ff">#if defined __STDC__ &amp;&amp; __STDC__-</font><font color="#ffff00">0</font>
+        <font color="#ffff00">case</font> <font color="#ff40ff">'\a'</font>: *o++ = <font color="#ffff00">'a'</font>; <font color="#ffff00">break</font>;
+<font color="#ff40ff">#else</font> <font color="#00ffff">/*</font><font color="#00ffff"> Not STDC; we'll just assume ASCII </font><font color="#00ffff">*/</font>
+        <font color="#ffff00">case</font> <font color="#ff40ff">0</font><font color="#ffff00">07</font>:  *o++ = <font color="#ffff00">'a'</font>; <font color="#ffff00">break</font>;
+<font color="#ff40ff">#endif</font>
+        <font color="#ffff00">case</font> <font color="#ff40ff">'\b'</font>: *o++ = <font color="#ffff00">'b'</font>; <font color="#ffff00">break</font>;
+        <font color="#ffff00">case</font> <font color="#ff40ff">'\f'</font>: *o++ = <font color="#ffff00">'f'</font>; <font color="#ffff00">break</font>;
+        <font color="#ffff00">case</font> <font color="#ff40ff">'\n'</font>: *o++ = <font color="#ffff00">'n'</font>; <font color="#ffff00">break</font>;
+        <font color="#ffff00">case</font> <font color="#ff40ff">'\r'</font>: *o++ = <font color="#ffff00">'r'</font>; <font color="#ffff00">break</font>;
+        <font color="#ffff00">case</font> <font color="#ff40ff">'\t'</font>: *o++ = <font color="#ffff00">'t'</font>; <font color="#ffff00">break</font>;
+        <font color="#ffff00">case</font> <font color="#ff40ff">'\v'</font>: *o++ = <font color="#ffff00">'v'</font>; <font color="#ffff00">break</font>;
+        <font color="#ffff00">default</font>:
+          sprintf(o, <font color="#ffff00">&quot;</font><font color="#ff40ff">%03o</font><font color="#ffff00">&quot;</font>, *p);
+          o += strlen(o);
+          <font color="#ffff00">break</font>;
+        }
+      }
+      olen = o - obuf;
+      <font color="#ffff00">if</font> (width+olen &gt;= line_len &amp;&amp; line_len &gt; <font color="#ffff00">0</font>) {
+      ck_fwrite(<font color="#ffff00">&quot;</font><font color="#ff40ff">\\\n</font><font color="#ffff00">&quot;</font>, <font color="#ffff00">1</font>, <font color="#ffff00">2</font>, fp);
+      width = <font color="#ffff00">0</font>;
+      }
+      ck_fwrite(obuf, <font color="#ffff00">1</font>, olen, fp);
+      width += olen;
+  }
+  ck_fwrite(<font color="#ffff00">&quot;$</font><font color="#ff40ff">\n</font><font color="#ffff00">&quot;</font>, <font color="#ffff00">1</font>, <font color="#ffff00">2</font>, fp);
+  flush_output (fp);
+}
+
+
+<font color="#00ff00">static</font> <font color="#00ff00">enum</font> replacement_types append_replacement P_((<font color="#00ff00">struct</font> line *, <font color="#00ff00">struct</font> replacement *,
+                             <font color="#00ff00">struct</font> re_registers *,
+                             <font color="#00ff00">enum</font> replacement_types));
+<font color="#00ff00">static</font> <font color="#00ff00">enum</font> replacement_types
+append_replacement (buf, p, regs, repl_mod)
+  <font color="#00ff00">struct</font> line *buf;
+  <font color="#00ff00">struct</font> replacement *p;
+  <font color="#00ff00">struct</font> re_registers *regs;
+  <font color="#00ff00">enum</font> replacement_types repl_mod;
+{
+  <font color="#ffff00">for</font> (; p; p=p-&gt;next)
+    {
+      <font color="#00ff00">int</font> i = p-&gt;subst_id;
+      <font color="#00ff00">enum</font> replacement_types curr_type;
+
+      <font color="#00ffff">/*</font><font color="#00ffff"> Apply a \[lu] modifier that was given earlier, but which we</font>
+<font color="#00ffff">         have not had yet the occasion to apply.  But don't do it</font>
+<font color="#00ffff">         if this replacement has a modifier of its own. </font><font color="#00ffff">*/</font>
+      curr_type = (p-&gt;repl_type &amp; REPL_MODIFIERS)
+        ? p-&gt;repl_type
+        : p-&gt;repl_type | repl_mod;
+
+      repl_mod = <font color="#ffff00">0</font>;
+      <font color="#ffff00">if</font> (p-&gt;prefix_length)
+        {
+          str_append_modified(buf, p-&gt;prefix, p-&gt;prefix_length,
+                      curr_type);
+          curr_type &amp;= ~REPL_MODIFIERS;
+        }
+
+      <font color="#ffff00">if</font> (<font color="#ffff00">0</font> &lt;= i)
+    {
+          <font color="#ffff00">if</font> (regs-&gt;end[i] == regs-&gt;start[i] &amp;&amp; p-&gt;repl_type &amp; REPL_MODIFIERS)
+            <font color="#00ffff">/*</font><font color="#00ffff"> Save this modifier, we shall apply it later.</font>
+<font color="#00ffff">           e.g. in s/()([a-z])/\u\1\2/</font>
+<font color="#00ffff">           the \u modifier is applied to \2, not \1 </font><font color="#00ffff">*/</font>
+        repl_mod = curr_type &amp; REPL_MODIFIERS;
+
+      <font color="#ffff00">else</font> <font color="#ffff00">if</font> (regs-&gt;end[i] != regs-&gt;start[i])
+        str_append_modified(buf, line.active + regs-&gt;start[i],
+                    CAST(<font color="#00ff00">size_t</font>)(regs-&gt;end[i] - regs-&gt;start[i]),
+                    curr_type);
+    }
+    }
+
+  <font color="#ffff00">return</font> repl_mod;
+}
+
+<font color="#00ff00">static</font> <font color="#00ff00">void</font> do_subst P_((<font color="#00ff00">struct</font> subst *));
+<font color="#00ff00">static</font> <font color="#00ff00">void</font>
+do_subst(sub)
+  <font color="#00ff00">struct</font> subst *sub;
+{
+  <font color="#00ff00">size_t</font> start = <font color="#ffff00">0</font>; <font color="#00ffff">/*</font><font color="#00ffff"> where to start scan for (next) match in LINE </font><font color="#00ffff">*/</font>
+  <font color="#00ff00">size_t</font> last_end = <font color="#ffff00">0</font>;  <font color="#00ffff">/*</font><font color="#00ffff"> where did the last successful match end in LINE </font><font color="#00ffff">*/</font>
+  countT count = <font color="#ffff00">0</font>; <font color="#00ffff">/*</font><font color="#00ffff"> number of matches found </font><font color="#00ffff">*/</font>
+  <font color="#00ff00">bool</font> again = <font color="#ffff00">true</font>;
+
+  <font color="#00ff00">static</font> <font color="#00ff00">struct</font> re_registers regs;
+
+  line_reset(&amp;s_accum, &amp;line);
+
+  <font color="#00ffff">/*</font><font color="#00ffff"> The first part of the loop optimizes s/xxx// when xxx is at the</font>
+<font color="#00ffff">     start, and s/xxx$// </font><font color="#00ffff">*/</font>
+  <font color="#ffff00">if</font> (!match_regex(sub-&gt;regx, line.active, line.length, start,
+           &amp;regs, sub-&gt;max_id + <font color="#ffff00">1</font>))
+    <font color="#ffff00">return</font>;
+
+  <font color="#ffff00">if</font> (!sub-&gt;replacement &amp;&amp; sub-&gt;numb &lt;= <font color="#ffff00">1</font>)
+    {
+      <font color="#ffff00">if</font> (regs.start[<font color="#ffff00">0</font>] == <font color="#ffff00">0</font> &amp;&amp; !sub-&gt;global)
+        {
+      <font color="#00ffff">/*</font><font color="#00ffff"> We found a match, set the `replaced' flag. </font><font color="#00ffff">*/</font>
+      replaced = <font color="#ffff00">true</font>;
+
+      line.active += regs.end[<font color="#ffff00">0</font>];
+      line.length -= regs.end[<font color="#ffff00">0</font>];
+      line.alloc -= regs.end[<font color="#ffff00">0</font>];
+      <font color="#ffff00">goto</font> post_subst;
+        }
+      <font color="#ffff00">else</font> <font color="#ffff00">if</font> (regs.end[<font color="#ffff00">0</font>] == line.length)
+        {
+      <font color="#00ffff">/*</font><font color="#00ffff"> We found a match, set the `replaced' flag. </font><font color="#00ffff">*/</font>
+      replaced = <font color="#ffff00">true</font>;
+
+      line.length = regs.start[<font color="#ffff00">0</font>];
+      <font color="#ffff00">goto</font> post_subst;
+        }
+    }
+
+  <font color="#ffff00">do</font>
+    {
+      <font color="#00ff00">enum</font> replacement_types repl_mod = <font color="#ffff00">0</font>;
+
+      <font color="#00ff00">size_t</font> offset = regs.start[<font color="#ffff00">0</font>];
+      <font color="#00ff00">size_t</font> matched = regs.end[<font color="#ffff00">0</font>] - regs.start[<font color="#ffff00">0</font>];
+
+      <font color="#00ffff">/*</font><font color="#00ffff"> Copy stuff to the left of this match into the output string. </font><font color="#00ffff">*/</font>
+      <font color="#ffff00">if</font> (start &lt; offset)
+    str_append(&amp;s_accum, line.active + start, offset - start);
+
+      <font color="#00ffff">/*</font><font color="#00ffff"> If we're counting up to the Nth match, are we there yet?</font>
+<font color="#00ffff">         And even if we are there, there is another case we have to</font>
+<font color="#00ffff">     skip: are we matching an empty string immediately following</font>
+<font color="#00ffff">         another match?</font>
+
+<font color="#00ffff">         This latter case avoids that baaaac, when passed through</font>
+<font color="#00ffff">         s,a*,x,g, gives `xbxxcx' instead of xbxcx.  This behavior is</font>
+<font color="#00ffff">         unacceptable because it is not consistently applied (for</font>
+<font color="#00ffff">         example, `baaaa' gives `xbx', not `xbxx'). </font><font color="#00ffff">*/</font>
+      <font color="#ffff00">if</font> ((matched &gt; <font color="#ffff00">0</font> || count == <font color="#ffff00">0</font> || offset &gt; last_end)
+      &amp;&amp; ++count &gt;= sub-&gt;numb)
+        {
+          <font color="#00ffff">/*</font><font color="#00ffff"> We found a match, set the `replaced' flag. </font><font color="#00ffff">*/</font>
+          replaced = <font color="#ffff00">true</font>;
+
+          <font color="#00ffff">/*</font><font color="#00ffff"> Now expand the replacement string into the output string. </font><font color="#00ffff">*/</font>
+          repl_mod = append_replacement (&amp;s_accum, sub-&gt;replacement, &amp;regs, repl_mod);
+      again = sub-&gt;global;
+        }
+      <font color="#ffff00">else</font>
+    {
+          <font color="#00ffff">/*</font><font color="#00ffff"> The match was not replaced.  Copy the text until its</font>
+<font color="#00ffff">             end; if it was vacuous, skip over one character and</font>
+<font color="#00ffff">         add that character to the output.  </font><font color="#00ffff">*/</font>
+      <font color="#ffff00">if</font> (matched == <font color="#ffff00">0</font>)
+        {
+          <font color="#ffff00">if</font> (start &lt; line.length)
+            matched = <font color="#ffff00">1</font>;
+          <font color="#ffff00">else</font>
+            <font color="#ffff00">break</font>;
+        }
+
+      str_append(&amp;s_accum, line.active + offset, matched);
+        }
+
+      <font color="#00ffff">/*</font><font color="#00ffff"> Start after the match.  last_end is the real end of the matched</font>
+<font color="#00ffff">     substring, excluding characters that were skipped in case the RE</font>
+<font color="#00ffff">     matched the empty string.  </font><font color="#00ffff">*/</font>
+      start = offset + matched;
+      last_end = regs.end[<font color="#ffff00">0</font>];
+    }
+  <font color="#ffff00">while</font> (again
+     &amp;&amp; start &lt;= line.length
+     &amp;&amp; match_regex(sub-&gt;regx, line.active, line.length, start,
+            &amp;regs, sub-&gt;max_id + <font color="#ffff00">1</font>));
+
+  <font color="#00ffff">/*</font><font color="#00ffff"> Copy stuff to the right of the last match into the output string. </font><font color="#00ffff">*/</font>
+  <font color="#ffff00">if</font> (start &lt; line.length)
+    str_append(&amp;s_accum, line.active + start, line.length-start);
+  s_accum.chomped = line.chomped;
+
+  <font color="#00ffff">/*</font><font color="#00ffff"> Exchange line and s_accum.  This can be much cheaper</font>
+<font color="#00ffff">     than copying s_accum.active into line.text (for huge lines). </font><font color="#00ffff">*/</font>
+  line_exchange(&amp;line, &amp;s_accum, <font color="#ffff00">false</font>);
+
+  <font color="#00ffff">/*</font><font color="#00ffff"> Finish up. </font><font color="#00ffff">*/</font>
+  <font color="#ffff00">if</font> (count &lt; sub-&gt;numb)
+    <font color="#ffff00">return</font>;
+
+ <font color="#ffff00">post_subst</font>:
+  <font color="#ffff00">if</font> (sub-&gt;print &amp; <font color="#ffff00">1</font>)
+    output_line(line.active, line.length, line.chomped, &amp;output_file);
+
+  <font color="#ffff00">if</font> (sub-&gt;eval)
+    {
+<font color="#ff40ff">#ifdef HAVE_POPEN</font>
+      <font color="#00ff00">FILE</font> *pipe_fp;
+      line_reset(&amp;s_accum, <font color="#ffff00">NULL</font>);
+
+      str_append (&amp;line, <font color="#ffff00">&quot;&quot;</font>, <font color="#ffff00">1</font>);
+      pipe_fp = popen(line.active, <font color="#ffff00">&quot;r&quot;</font>);
+
+      <font color="#ffff00">if</font> (pipe_fp != <font color="#ffff00">NULL</font>)
+    {
+      <font color="#ffff00">while</font> (!feof (pipe_fp))
+        {
+          <font color="#00ff00">char</font> buf[<font color="#ffff00">4096</font>];
+          <font color="#00ff00">int</font> n = fread (buf, <font color="#ffff00">sizeof</font>(<font color="#00ff00">char</font>), <font color="#ffff00">4096</font>, pipe_fp);
+          <font color="#ffff00">if</font> (n &gt; <font color="#ffff00">0</font>)
+        str_append(&amp;s_accum, buf, n);
+        }
+
+      pclose (pipe_fp);
+
+      <font color="#00ffff">/*</font><font color="#00ffff"> Exchange line and s_accum.  This can be much cheaper than copying</font>
+<font color="#00ffff">         s_accum.active into line.text (for huge lines).  See comment above</font>
+<font color="#00ffff">         for 'g' as to while the third argument is incorrect anyway.  </font><font color="#00ffff">*/</font>
+      line_exchange(&amp;line, &amp;s_accum, <font color="#ffff00">true</font>);
+      <font color="#ffff00">if</font> (line.length &amp;&amp;
+          line.active[line.length - <font color="#ffff00">1</font>] == <font color="#ff40ff">'\n'</font>)
+        line.length--;
+    }
+      <font color="#ffff00">else</font>
+    panic(_(<font color="#ffff00">&quot;error in subprocess&quot;</font>));
+<font color="#ff40ff">#else</font>
+      panic(_(<font color="#ffff00">&quot;option `e' not supported&quot;</font>));
+<font color="#ff40ff">#endif</font>
+    }
+
+  <font color="#ffff00">if</font> (sub-&gt;print &amp; <font color="#ffff00">2</font>)
+    output_line(line.active, line.length, line.chomped, &amp;output_file);
+  <font color="#ffff00">if</font> (sub-&gt;outf)
+    output_line(line.active, line.length, line.chomped, sub-&gt;outf);
+}
+
+<font color="#ff40ff">#ifdef EXPERIMENTAL_DASH_N_OPTIMIZATION</font>
+<font color="#00ffff">/*</font><font color="#00ffff"> Used to attempt a simple-minded optimization. </font><font color="#00ffff">*/</font>
+
+<font color="#00ff00">static</font> countT branches;
+
+<font color="#00ff00">static</font> countT count_branches P_((<font color="#00ff00">struct</font> vector *));
+<font color="#00ff00">static</font> countT
+count_branches(program)
+  <font color="#00ff00">struct</font> vector *program;
+{
+  <font color="#00ff00">struct</font> sed_cmd *cur_cmd = program-&gt;v;
+  countT isn_cnt = program-&gt;v_length;
+  countT cnt = <font color="#ffff00">0</font>;
+
+  <font color="#ffff00">while</font> (isn_cnt-- &gt; <font color="#ffff00">0</font>)
+    {
+      <font color="#ffff00">switch</font> (cur_cmd-&gt;cmd)
+    {
+    <font color="#ffff00">case</font> <font color="#ffff00">'b'</font>:
+    <font color="#ffff00">case</font> <font color="#ffff00">'t'</font>:
+    <font color="#ffff00">case</font> <font color="#ffff00">'T'</font>:
+    <font color="#ffff00">case</font> <font color="#ffff00">'{'</font>:
+      ++cnt;
+    }
+    }
+  <font color="#ffff00">return</font> cnt;
+}
+
+<font color="#00ff00">static</font> <font color="#00ff00">struct</font> sed_cmd *shrink_program P_((<font color="#00ff00">struct</font> vector *, <font color="#00ff00">struct</font> sed_cmd *));
+<font color="#00ff00">static</font> <font color="#00ff00">struct</font> sed_cmd *
+shrink_program(vec, cur_cmd)
+  <font color="#00ff00">struct</font> vector *vec;
+  <font color="#00ff00">struct</font> sed_cmd *cur_cmd;
+{
+  <font color="#00ff00">struct</font> sed_cmd *v = vec-&gt;v;
+  <font color="#00ff00">struct</font> sed_cmd *last_cmd = v + vec-&gt;v_length;
+  <font color="#00ff00">struct</font> sed_cmd *p;
+  countT cmd_cnt;
+
+  <font color="#ffff00">for</font> (p=v; p &lt; cur_cmd; ++p)
+    <font color="#ffff00">if</font> (p-&gt;cmd != <font color="#ffff00">'#'</font>)
+      MEMCPY(v++, p, <font color="#ffff00">sizeof</font> *v);
+  cmd_cnt = v - vec-&gt;v;
+
+  <font color="#ffff00">for</font> (; p &lt; last_cmd; ++p)
+    <font color="#ffff00">if</font> (p-&gt;cmd != <font color="#ffff00">'#'</font>)
+      MEMCPY(v++, p, <font color="#ffff00">sizeof</font> *v);
+  vec-&gt;v_length = v - vec-&gt;v;
+
+  <font color="#ffff00">return</font> (<font color="#ffff00">0</font> &lt; vec-&gt;v_length) ? (vec-&gt;v + cmd_cnt) : CAST(<font color="#00ff00">struct</font> sed_cmd *)<font color="#ffff00">0</font>;
+}
+<font color="#ff40ff">#endif</font> <font color="#00ffff">/*</font><font color="#00ffff">EXPERIMENTAL_DASH_N_OPTIMIZATION</font><font color="#00ffff">*/</font>
+
+<font color="#00ffff">/*</font><font color="#00ffff"> Execute the program `vec' on the current input line.</font>
+<font color="#00ffff">   Return exit status if caller should quit, -1 otherwise. </font><font color="#00ffff">*/</font>
+<font color="#00ff00">static</font> <font color="#00ff00">int</font> execute_program P_((<font color="#00ff00">struct</font> vector *, <font color="#00ff00">struct</font> input *));
+<font color="#00ff00">static</font> <font color="#00ff00">int</font>
+execute_program(vec, input)
+  <font color="#00ff00">struct</font> vector *vec;
+  <font color="#00ff00">struct</font> input *input;
+{
+  <font color="#00ff00">struct</font> sed_cmd *cur_cmd;
+  <font color="#00ff00">struct</font> sed_cmd *end_cmd;
+
+  cur_cmd = vec-&gt;v;
+  end_cmd = vec-&gt;v + vec-&gt;v_length;
+  <font color="#ffff00">while</font> (cur_cmd &lt; end_cmd)
+    {
+      <font color="#ffff00">if</font> (match_address_p(cur_cmd, input) != cur_cmd-&gt;addr_bang)
+    {
+      <font color="#ffff00">switch</font> (cur_cmd-&gt;cmd)
+        {
+        <font color="#ffff00">case</font> <font color="#ffff00">'a'</font>:
+          {
+        <font color="#00ff00">struct</font> append_queue *aq = next_append_slot();
+        aq-&gt;text = cur_cmd-&gt;x.cmd_txt.text;
+        aq-&gt;textlen = cur_cmd-&gt;x.cmd_txt.text_length;
+          }
+          <font color="#ffff00">break</font>;
+
+        <font color="#ffff00">case</font> <font color="#ffff00">'{'</font>:
+        <font color="#ffff00">case</font> <font color="#ffff00">'b'</font>:
+          cur_cmd = vec-&gt;v + cur_cmd-&gt;x.jump_index;
+          <font color="#ffff00">continue</font>;
+
+        <font color="#ffff00">case</font> <font color="#ffff00">'}'</font>:
+        <font color="#ffff00">case</font> <font color="#ffff00">'#'</font>:
+        <font color="#ffff00">case</font> <font color="#ffff00">':'</font>:
+          <font color="#00ffff">/*</font><font color="#00ffff"> Executing labels and block-ends are easy. </font><font color="#00ffff">*/</font>
+          <font color="#ffff00">break</font>;
+
+        <font color="#ffff00">case</font> <font color="#ffff00">'c'</font>:
+          <font color="#ffff00">if</font> (cur_cmd-&gt;range_state != RANGE_ACTIVE)
+        output_line(cur_cmd-&gt;x.cmd_txt.text,
+                cur_cmd-&gt;x.cmd_txt.text_length - <font color="#ffff00">1</font>, <font color="#ffff00">true</font>,
+                &amp;output_file);
+          <font color="#00ffff">/*</font><font color="#00ffff"> POSIX.2 is silent about c starting a new cycle,</font>
+<font color="#00ffff">         but it seems to be expected (and make sense). </font><font color="#00ffff">*/</font>
+          <font color="#00ffff">/*</font><font color="#00ffff"> Fall Through </font><font color="#00ffff">*/</font>
+        <font color="#ffff00">case</font> <font color="#ffff00">'d'</font>:
+          <font color="#ffff00">return</font> -<font color="#ffff00">1</font>;
+
+        <font color="#ffff00">case</font> <font color="#ffff00">'D'</font>:
+          {
+        <font color="#00ff00">char</font> *p = memchr(line.active, <font color="#ff40ff">'\n'</font>, line.length);
+        <font color="#ffff00">if</font> (!p)
+          <font color="#ffff00">return</font> -<font color="#ffff00">1</font>;
+
+        ++p;
+        line.alloc -= p - line.active;
+        line.length -= p - line.active;
+        line.active += p - line.active;
+
+        <font color="#00ffff">/*</font><font color="#00ffff"> reset to start next cycle without reading a new line: </font><font color="#00ffff">*/</font>
+        cur_cmd = vec-&gt;v;
+        <font color="#ffff00">continue</font>;
+          }
+
+        <font color="#ffff00">case</font> <font color="#ffff00">'e'</font>: {
+<font color="#ff40ff">#ifdef HAVE_POPEN</font>
+          <font color="#00ff00">FILE</font> *pipe_fp;
+          <font color="#00ff00">int</font> cmd_length = cur_cmd-&gt;x.cmd_txt.text_length;
+          line_reset(&amp;s_accum, <font color="#ffff00">NULL</font>);
+
+          <font color="#ffff00">if</font> (!cmd_length)
+        {
+          str_append (&amp;line, <font color="#ffff00">&quot;&quot;</font>, <font color="#ffff00">1</font>);
+          pipe_fp = popen(line.active, <font color="#ffff00">&quot;r&quot;</font>);
+        }
+          <font color="#ffff00">else</font>
+        {
+          cur_cmd-&gt;x.cmd_txt.text[cmd_length - <font color="#ffff00">1</font>] = <font color="#ffff00">0</font>;
+          pipe_fp = popen(cur_cmd-&gt;x.cmd_txt.text, <font color="#ffff00">&quot;r&quot;</font>);
+                  output_missing_newline(&amp;output_file);
+        }
+
+          <font color="#ffff00">if</font> (pipe_fp != <font color="#ffff00">NULL</font>)
+        {
+          <font color="#00ff00">char</font> buf[<font color="#ffff00">4096</font>];
+          <font color="#00ff00">int</font> n;
+          <font color="#ffff00">while</font> (!feof (pipe_fp))
+            <font color="#ffff00">if</font> ((n = fread (buf, <font color="#ffff00">sizeof</font>(<font color="#00ff00">char</font>), <font color="#ffff00">4096</font>, pipe_fp)) &gt; <font color="#ffff00">0</font>)
+              {
+            <font color="#ffff00">if</font> (!cmd_length)
+              str_append(&amp;s_accum, buf, n);
+            <font color="#ffff00">else</font>
+              ck_fwrite(buf, <font color="#ffff00">1</font>, n, output_file.fp);
+              }
+
+          pclose (pipe_fp);
+          <font color="#ffff00">if</font> (!cmd_length)
+            {
+              <font color="#00ffff">/*</font><font color="#00ffff"> Store into pattern space for plain `e' commands </font><font color="#00ffff">*/</font>
+              <font color="#ffff00">if</font> (s_accum.length &amp;&amp;
+              s_accum.active[s_accum.length - <font color="#ffff00">1</font>] == <font color="#ff40ff">'\n'</font>)
+            s_accum.length--;
+
+              <font color="#00ffff">/*</font><font color="#00ffff"> Exchange line and s_accum.  This can be much</font>
+<font color="#00ffff">             cheaper than copying s_accum.active into line.text</font>
+<font color="#00ffff">             (for huge lines).  See comment above for 'g' as</font>
+<font color="#00ffff">             to while the third argument is incorrect anyway.  </font><font color="#00ffff">*/</font>
+              line_exchange(&amp;line, &amp;s_accum, <font color="#ffff00">true</font>);
+            }
+                  <font color="#ffff00">else</font>
+                    flush_output(output_file.fp);
+
+        }
+          <font color="#ffff00">else</font>
+        panic(_(<font color="#ffff00">&quot;error in subprocess&quot;</font>));
+<font color="#ff40ff">#else</font>
+          panic(_(<font color="#ffff00">&quot;`e' command not supported&quot;</font>));
+<font color="#ff40ff">#endif</font>
+          <font color="#ffff00">break</font>;
+        }
+
+        <font color="#ffff00">case</font> <font color="#ffff00">'g'</font>:
+          <font color="#00ffff">/*</font><font color="#00ffff"> We do not have a really good choice for the third parameter.</font>
+<font color="#00ffff">         The problem is that hold space and the input file might as</font>
+<font color="#00ffff">         well have different states; copying it from hold space means</font>
+<font color="#00ffff">         that subsequent input might be read incorrectly, while</font>
+<font color="#00ffff">         keeping it as in pattern space means that commands operating</font>
+<font color="#00ffff">         on the moved buffer might consider a wrong character set.</font>
+<font color="#00ffff">         We keep it true because it's what sed &lt;= 4.1.5 did.  </font><font color="#00ffff">*/</font>
+          line_copy(&amp;hold, &amp;line, <font color="#ffff00">true</font>);
+          <font color="#ffff00">break</font>;
+
+        <font color="#ffff00">case</font> <font color="#ffff00">'G'</font>:
+          <font color="#00ffff">/*</font><font color="#00ffff"> We do not have a really good choice for the third parameter.</font>
+<font color="#00ffff">         The problem is that hold space and pattern space might as</font>
+<font color="#00ffff">         well have different states.  So, true is as wrong as false.</font>
+<font color="#00ffff">         We keep it true because it's what sed &lt;= 4.1.5 did, but</font>
+<font color="#00ffff">         we could consider having line_ap.  </font><font color="#00ffff">*/</font>
+          line_append(&amp;hold, &amp;line, <font color="#ffff00">true</font>);
+          <font color="#ffff00">break</font>;
+
+        <font color="#ffff00">case</font> <font color="#ffff00">'h'</font>:
+          <font color="#00ffff">/*</font><font color="#00ffff"> Here, it is ok to have true.  </font><font color="#00ffff">*/</font>
+          line_copy(&amp;line, &amp;hold, <font color="#ffff00">true</font>);
+          <font color="#ffff00">break</font>;
+
+        <font color="#ffff00">case</font> <font color="#ffff00">'H'</font>:
+          <font color="#00ffff">/*</font><font color="#00ffff"> See comment above for 'G' regarding the third parameter.  </font><font color="#00ffff">*/</font>
+          line_append(&amp;line, &amp;hold, <font color="#ffff00">true</font>);
+          <font color="#ffff00">break</font>;
+
+        <font color="#ffff00">case</font> <font color="#ffff00">'i'</font>:
+          output_line(cur_cmd-&gt;x.cmd_txt.text,
+              cur_cmd-&gt;x.cmd_txt.text_length - <font color="#ffff00">1</font>,
+              <font color="#ffff00">true</font>, &amp;output_file);
+          <font color="#ffff00">break</font>;
+
+        <font color="#ffff00">case</font> <font color="#ffff00">'l'</font>:
+          do_list(cur_cmd-&gt;x.int_arg == -<font color="#ffff00">1</font>
+              ? lcmd_out_line_len
+              : cur_cmd-&gt;x.int_arg);
+          <font color="#ffff00">break</font>;
+
+        <font color="#ffff00">case</font> <font color="#ffff00">'L'</font>:
+              output_missing_newline(&amp;output_file);
+          fmt(line.active, line.active + line.length,
+          cur_cmd-&gt;x.int_arg == -<font color="#ffff00">1</font>
+          ? lcmd_out_line_len
+          : cur_cmd-&gt;x.int_arg,
+          output_file.fp);
+              flush_output(output_file.fp);
+          <font color="#ffff00">break</font>;
+
+        <font color="#ffff00">case</font> <font color="#ffff00">'n'</font>:
+          <font color="#ffff00">if</font> (!no_default_output)
+        output_line(line.active, line.length, line.chomped, &amp;output_file);
+          <font color="#ffff00">if</font> (test_eof(input) || !read_pattern_space(input, vec, <font color="#ffff00">false</font>))
+        <font color="#ffff00">return</font> -<font color="#ffff00">1</font>;
+          <font color="#ffff00">break</font>;
+
+        <font color="#ffff00">case</font> <font color="#ffff00">'N'</font>:
+          str_append(&amp;line, <font color="#ffff00">&quot;</font><font color="#ff40ff">\n</font><font color="#ffff00">&quot;</font>, <font color="#ffff00">1</font>);
+
+              <font color="#ffff00">if</font> (test_eof(input) || !read_pattern_space(input, vec, <font color="#ffff00">true</font>))
+                {
+                  line.length--;
+                  <font color="#ffff00">if</font> (posixicity == POSIXLY_EXTENDED &amp;&amp; !no_default_output)
+                     output_line(line.active, line.length, line.chomped,
+                                 &amp;output_file);
+                  <font color="#ffff00">return</font> -<font color="#ffff00">1</font>;
+                }
+          <font color="#ffff00">break</font>;
+
+        <font color="#ffff00">case</font> <font color="#ffff00">'p'</font>:
+          output_line(line.active, line.length, line.chomped, &amp;output_file);
+          <font color="#ffff00">break</font>;
+
+        <font color="#ffff00">case</font> <font color="#ffff00">'P'</font>:
+          {
+        <font color="#00ff00">char</font> *p = memchr(line.active, <font color="#ff40ff">'\n'</font>, line.length);
+        output_line(line.active, p ? p - line.active : line.length,
+                p ? <font color="#ffff00">true</font> : line.chomped, &amp;output_file);
+          }
+          <font color="#ffff00">break</font>;
+
+            <font color="#ffff00">case</font> <font color="#ffff00">'q'</font>:
+              <font color="#ffff00">if</font> (!no_default_output)
+                output_line(line.active, line.length, line.chomped, &amp;output_file);
+          dump_append_queue();
+
+        <font color="#ffff00">case</font> <font color="#ffff00">'Q'</font>:
+          <font color="#ffff00">return</font> cur_cmd-&gt;x.int_arg == -<font color="#ffff00">1</font> ? <font color="#ffff00">0</font> : cur_cmd-&gt;x.int_arg;
+
+        <font color="#ffff00">case</font> <font color="#ffff00">'r'</font>:
+          <font color="#ffff00">if</font> (cur_cmd-&gt;x.fname)
+        {
+          <font color="#00ff00">struct</font> append_queue *aq = next_append_slot();
+          aq-&gt;fname = cur_cmd-&gt;x.fname;
+        }
+          <font color="#ffff00">break</font>;
+
+        <font color="#ffff00">case</font> <font color="#ffff00">'R'</font>:
+          <font color="#ffff00">if</font> (cur_cmd-&gt;x.fp &amp;&amp; !feof (cur_cmd-&gt;x.fp))
+        {
+          <font color="#00ff00">struct</font> append_queue *aq;
+          <font color="#00ff00">size_t</font> buflen;
+          <font color="#00ff00">char</font> *text = <font color="#ffff00">NULL</font>;
+          <font color="#00ff00">int</font> result;
+
+          result = ck_getline (&amp;text, &amp;buflen, cur_cmd-&gt;x.fp);
+          <font color="#ffff00">if</font> (result != <font color="#ffff00">EOF</font>)
+            {
+              aq = next_append_slot();
+              aq-&gt;free = <font color="#ffff00">true</font>;
+              aq-&gt;text = text;
+              aq-&gt;textlen = result;
+            }
+        }
+          <font color="#ffff00">break</font>;
+
+        <font color="#ffff00">case</font> <font color="#ffff00">'s'</font>:
+          do_subst(cur_cmd-&gt;x.cmd_subst);
+          <font color="#ffff00">break</font>;
+
+        <font color="#ffff00">case</font> <font color="#ffff00">'t'</font>:
+          <font color="#ffff00">if</font> (replaced)
+        {
+          replaced = <font color="#ffff00">false</font>;
+          cur_cmd = vec-&gt;v + cur_cmd-&gt;x.jump_index;
+          <font color="#ffff00">continue</font>;
+        }
+          <font color="#ffff00">break</font>;
+
+        <font color="#ffff00">case</font> <font color="#ffff00">'T'</font>:
+          <font color="#ffff00">if</font> (!replaced)
+        {
+          cur_cmd = vec-&gt;v + cur_cmd-&gt;x.jump_index;
+          <font color="#ffff00">continue</font>;
+        }
+          <font color="#ffff00">else</font>
+        replaced = <font color="#ffff00">false</font>;
+          <font color="#ffff00">break</font>;
+
+        <font color="#ffff00">case</font> <font color="#ffff00">'w'</font>:
+          <font color="#ffff00">if</font> (cur_cmd-&gt;x.fp)
+        output_line(line.active, line.length,
+                line.chomped, cur_cmd-&gt;x.outf);
+          <font color="#ffff00">break</font>;
+
+        <font color="#ffff00">case</font> <font color="#ffff00">'W'</font>:
+          <font color="#ffff00">if</font> (cur_cmd-&gt;x.fp)
+            {
+          <font color="#00ff00">char</font> *p = memchr(line.active, <font color="#ff40ff">'\n'</font>, line.length);
+          output_line(line.active, p ? p - line.active : line.length,
+                  p ? <font color="#ffff00">true</font> : line.chomped, cur_cmd-&gt;x.outf);
+            }
+          <font color="#ffff00">break</font>;
+
+        <font color="#ffff00">case</font> <font color="#ffff00">'x'</font>:
+          <font color="#00ffff">/*</font><font color="#00ffff"> See comment above for 'g' regarding the third parameter.  </font><font color="#00ffff">*/</font>
+          line_exchange(&amp;line, &amp;hold, <font color="#ffff00">false</font>);
+          <font color="#ffff00">break</font>;
+
+        <font color="#ffff00">case</font> <font color="#ffff00">'y'</font>:
+          {
+<font color="#ff40ff">#ifdef HAVE_MBRTOWC</font>
+               <font color="#ffff00">if</font> (mb_cur_max &gt; <font color="#ffff00">1</font>)
+                 {
+                   <font color="#00ff00">int</font> idx, prev_idx; <font color="#00ffff">/*</font><font color="#00ffff"> index in the input line.  </font><font color="#00ffff">*/</font>
+                   <font color="#00ff00">char</font> **trans;
+                   <font color="#00ff00">mbstate_t</font> mbstate;
+                   memset(&amp;mbstate, <font color="#ffff00">0</font>, <font color="#ffff00">sizeof</font>(<font color="#00ff00">mbstate_t</font>));
+                   <font color="#ffff00">for</font> (idx = <font color="#ffff00">0</font>; idx &lt; line.length;)
+                     {
+                       <font color="#00ff00">int</font> mbclen, i;
+                       mbclen = MBRLEN (line.active + idx, line.length - idx,
+                                          &amp;mbstate);
+                       <font color="#00ffff">/*</font><font color="#00ffff"> An invalid sequence, or a truncated multibyte</font>
+<font color="#00ffff">                          character.  We treat it as a singlebyte character.</font>
+<font color="#00ffff">                       </font><font color="#00ffff">*/</font>
+                       <font color="#ffff00">if</font> (mbclen == (<font color="#00ff00">size_t</font>) -<font color="#ffff00">1</font> || mbclen == (<font color="#00ff00">size_t</font>) -<font color="#ffff00">2</font>
+                           || mbclen == <font color="#ffff00">0</font>)
+                         mbclen = <font color="#ffff00">1</font>;
+
+                       trans = cur_cmd-&gt;x.translatemb;
+                       <font color="#00ffff">/*</font><font color="#00ffff"> `i' indicate i-th translate pair.  </font><font color="#00ffff">*/</font>
+                       <font color="#ffff00">for</font> (i = <font color="#ffff00">0</font>; trans[<font color="#ffff00">2</font>*i] != <font color="#ffff00">NULL</font>; i++)
+                         {
+                           <font color="#ffff00">if</font> (strncmp(line.active + idx, trans[<font color="#ffff00">2</font>*i], mbclen) == <font color="#ffff00">0</font>)
+                             {
+                               <font color="#00ff00">bool</font> move_remain_buffer = <font color="#ffff00">false</font>;
+                               <font color="#00ff00">int</font> trans_len = strlen(trans[<font color="#ffff00">2</font>*i+<font color="#ffff00">1</font>]);
+
+                               <font color="#ffff00">if</font> (mbclen &lt; trans_len)
+                                 {
+                                   <font color="#00ff00">int</font> new_len;
+                                   new_len = line.length + <font color="#ffff00">1</font> + trans_len - mbclen;
+                                   <font color="#00ffff">/*</font><font color="#00ffff"> We must extend the line buffer.  </font><font color="#00ffff">*/</font>
+                                   <font color="#ffff00">if</font> (line.alloc &lt; new_len)
+                                     {
+                                       <font color="#00ffff">/*</font><font color="#00ffff"> And we must resize the buffer.  </font><font color="#00ffff">*/</font>
+                                       resize_line(&amp;line, new_len);
+                                     }
+                                   move_remain_buffer = <font color="#ffff00">true</font>;
+                                 }
+                               <font color="#ffff00">else</font> <font color="#ffff00">if</font> (mbclen &gt; trans_len)
+                                 {
+                                   <font color="#00ffff">/*</font><font color="#00ffff"> We must truncate the line buffer.  </font><font color="#00ffff">*/</font>
+                                   move_remain_buffer = <font color="#ffff00">true</font>;
+                                 }
+                               prev_idx = idx;
+                               <font color="#ffff00">if</font> (move_remain_buffer)
+                                 {
+                                   <font color="#00ff00">int</font> move_len, move_offset;
+                                   <font color="#00ff00">char</font> *move_from, *move_to;
+                                   <font color="#00ffff">/*</font><font color="#00ffff"> Move the remaining with \0.  </font><font color="#00ffff">*/</font>
+                                   move_from = line.active + idx + mbclen;
+                                   move_to = line.active + idx + trans_len;
+                                   move_len = line.length + <font color="#ffff00">1</font> - idx - mbclen;
+                                   move_offset = trans_len - mbclen;
+                                   memmove(move_to, move_from, move_len);
+                                   line.length += move_offset;
+                                   idx += move_offset;
+                                 }
+                               strncpy(line.active + prev_idx, trans[<font color="#ffff00">2</font>*i+<font color="#ffff00">1</font>],
+                                       trans_len);
+                               <font color="#ffff00">break</font>;
+                             }
+                         }
+                       idx += mbclen;
+                     }
+                 }
+               <font color="#ffff00">else</font>
+<font color="#ff40ff">#endif</font> <font color="#00ffff">/*</font><font color="#00ffff"> HAVE_MBRTOWC </font><font color="#00ffff">*/</font>
+                 {
+                   <font color="#00ff00">unsigned</font> <font color="#00ff00">char</font> *p, *e;
+                   p = CAST(<font color="#00ff00">unsigned</font> <font color="#00ff00">char</font> *)line.active;
+                   <font color="#ffff00">for</font> (e=p+line.length; p&lt;e; ++p)
+                     *p = cur_cmd-&gt;x.translate[*p];
+                 }
+          }
+          <font color="#ffff00">break</font>;
+
+        <font color="#ffff00">case</font> <font color="#ffff00">'z'</font>:
+          line.length = <font color="#ffff00">0</font>;
+          <font color="#ffff00">break</font>;
+
+        <font color="#ffff00">case</font> <font color="#ffff00">'='</font>:
+              output_missing_newline(&amp;output_file);
+              fprintf(output_file.fp, <font color="#ffff00">&quot;</font><font color="#ff40ff">%lu</font><font color="#ff40ff">\n</font><font color="#ffff00">&quot;</font>,
+                      CAST(<font color="#00ff00">unsigned</font> <font color="#00ff00">long</font>)input-&gt;line_number);
+              flush_output(output_file.fp);
+          <font color="#ffff00">break</font>;
+
+        <font color="#ffff00">default</font>:
+          panic(<font color="#ffff00">&quot;INTERNAL ERROR: Bad cmd </font><font color="#ff40ff">%c</font><font color="#ffff00">&quot;</font>, cur_cmd-&gt;cmd);
+        }
+    }
+
+<font color="#ff40ff">#ifdef EXPERIMENTAL_DASH_N_OPTIMIZATION</font>
+      <font color="#00ffff">/*</font><font color="#00ffff"> If our top-level program consists solely of commands with</font>
+<font color="#00ffff">         ADDR_IS_NUM addresses then once we past the last mentioned</font>
+<font color="#00ffff">         line we should be able to quit if no_default_output is true,</font>
+<font color="#00ffff">         or otherwise quickly copy input to output.  Now whether this</font>
+<font color="#00ffff">         optimization is a win or not depends on how cheaply we can</font>
+<font color="#00ffff">         implement this for the cases where it doesn't help, as</font>
+<font color="#00ffff">         compared against how much time is saved.  One semantic</font>
+<font color="#00ffff">         difference (which I think is an improvement) is that *this*</font>
+<font color="#00ffff">         version will terminate after printing line two in the script</font>
+<font color="#00ffff">         &quot;yes | sed -n 2p&quot;. </font>
+<font color="#00ffff">        </font>
+<font color="#00ffff">         Don't use this when in-place editing is active, because line</font>
+<font color="#00ffff">         numbers restart each time then. </font><font color="#00ffff">*/</font>
+      <font color="#ffff00">else</font> <font color="#ffff00">if</font> (!separate_files)
+    {
+      <font color="#ffff00">if</font> (cur_cmd-&gt;a1-&gt;addr_type == ADDR_IS_NUM
+          &amp;&amp; (cur_cmd-&gt;a2
+          ? cur_cmd-&gt;range_state == RANGE_CLOSED
+          : cur_cmd-&gt;a1-&gt;addr_number &lt; input-&gt;line_number))
+        {
+          <font color="#00ffff">/*</font><font color="#00ffff"> Skip this address next time </font><font color="#00ffff">*/</font>
+          cur_cmd-&gt;addr_bang = !cur_cmd-&gt;addr_bang;
+          cur_cmd-&gt;a1-&gt;addr_type = ADDR_IS_NULL;
+          <font color="#ffff00">if</font> (cur_cmd-&gt;a2)
+        cur_cmd-&gt;a2-&gt;addr_type = ADDR_IS_NULL;
+
+          <font color="#00ffff">/*</font><font color="#00ffff"> can we make an optimization? </font><font color="#00ffff">*/</font>
+          <font color="#ffff00">if</font> (cur_cmd-&gt;addr_bang)
+        {
+          <font color="#ffff00">if</font> (cur_cmd-&gt;cmd == <font color="#ffff00">'b'</font> || cur_cmd-&gt;cmd == <font color="#ffff00">'t'</font>
+              || cur_cmd-&gt;cmd == <font color="#ffff00">'T'</font> || cur_cmd-&gt;cmd == <font color="#ffff00">'}'</font>)
+            branches--;
+
+          cur_cmd-&gt;cmd = <font color="#ffff00">'#'</font>;   <font color="#00ffff">/*</font><font color="#00ffff"> replace with no-op </font><font color="#00ffff">*/</font>
+              <font color="#ffff00">if</font> (branches == <font color="#ffff00">0</font>)
+            cur_cmd = shrink_program(vec, cur_cmd);
+          <font color="#ffff00">if</font> (!cur_cmd &amp;&amp; no_default_output)
+            <font color="#ffff00">return</font> <font color="#ffff00">0</font>;
+          end_cmd = vec-&gt;v + vec-&gt;v_length;
+          <font color="#ffff00">if</font> (!cur_cmd)
+            cur_cmd = end_cmd;
+          <font color="#ffff00">continue</font>;
+        }
+        }
+    }
+<font color="#ff40ff">#endif</font> <font color="#00ffff">/*</font><font color="#00ffff">EXPERIMENTAL_DASH_N_OPTIMIZATION</font><font color="#00ffff">*/</font>
+
+      <font color="#00ffff">/*</font><font color="#00ffff"> this is buried down here so that a &quot;continue&quot; statement can skip it </font><font color="#00ffff">*/</font>
+      ++cur_cmd;
+    }
+
+    <font color="#ffff00">if</font> (!no_default_output)
+      output_line(line.active, line.length, line.chomped, &amp;output_file);
+    <font color="#ffff00">return</font> -<font color="#ffff00">1</font>;
+}
+
+<span class=""><hr class="PAGE-BREAK"></span>
+
+<font color="#00ffff">/*</font><font color="#00ffff"> Apply the compiled script to all the named files. </font><font color="#00ffff">*/</font>
+<font color="#00ff00">int</font>
+process_files(the_program, argv)
+  <font color="#00ff00">struct</font> vector *the_program;
+  <font color="#00ff00">char</font> **argv;
+{
+  <font color="#00ff00">static</font> <font color="#00ff00">char</font> dash[] = <font color="#ffff00">&quot;-&quot;</font>;
+  <font color="#00ff00">static</font> <font color="#00ff00">char</font> *stdin_argv[<font color="#ffff00">2</font>] = { dash, <font color="#ffff00">NULL</font> };
+  <font color="#00ff00">struct</font> input input;
+  <font color="#00ff00">int</font> status;
+
+  line_init(&amp;line, <font color="#ffff00">NULL</font>, INITIAL_BUFFER_SIZE);
+  line_init(&amp;hold, <font color="#ffff00">NULL</font>, <font color="#ffff00">0</font>);
+  line_init(&amp;buffer, <font color="#ffff00">NULL</font>, <font color="#ffff00">0</font>);
+
+<font color="#ff40ff">#ifdef EXPERIMENTAL_DASH_N_OPTIMIZATION</font>
+  branches = count_branches(the_program);
+<font color="#ff40ff">#endif</font> <font color="#00ffff">/*</font><font color="#00ffff">EXPERIMENTAL_DASH_N_OPTIMIZATION</font><font color="#00ffff">*/</font>
+  input.reset_at_next_file = <font color="#ffff00">true</font>;
+  <font color="#ffff00">if</font> (argv &amp;&amp; *argv)
+    input.file_list = argv;
+  <font color="#ffff00">else</font> <font color="#ffff00">if</font> (in_place_extension)
+    panic(_(<font color="#ffff00">&quot;no input files&quot;</font>));
+  <font color="#ffff00">else</font>
+    input.file_list = stdin_argv;
+
+  input.bad_count = <font color="#ffff00">0</font>;
+  input.line_number = <font color="#ffff00">0</font>;
+  input.read_fn = read_always_fail;
+  input.fp = <font color="#ffff00">NULL</font>;
+
+  status = <font color="#ffff00">EXIT_SUCCESS</font>;
+  <font color="#ffff00">while</font> (read_pattern_space(&amp;input, the_program, <font color="#ffff00">false</font>))
+    {
+      status = execute_program(the_program, &amp;input);
+      <font color="#ffff00">if</font> (status == -<font color="#ffff00">1</font>)
+    status = <font color="#ffff00">EXIT_SUCCESS</font>;
+      <font color="#ffff00">else</font>
+    <font color="#ffff00">break</font>;
+    }
+  closedown(&amp;input);
+
+<font color="#ff40ff">#ifdef DEBUG_LEAKS</font>
+  <font color="#00ffff">/*</font><font color="#00ffff"> We're about to exit, so these free()s are redundant.</font>
+<font color="#00ffff">     But if we're running under a memory-leak detecting</font>
+<font color="#00ffff">     implementation of malloc(), we want to explicitly</font>
+<font color="#00ffff">     deallocate in order to avoid extraneous noise from</font>
+<font color="#00ffff">     the allocator. </font><font color="#00ffff">*/</font>
+  release_append_queue();
+  FREE(buffer.text);
+  FREE(hold.text);
+  FREE(line.text);
+  FREE(s_accum.text);
+<font color="#ff40ff">#endif</font> <font color="#00ffff">/*</font><font color="#00ffff">DEBUG_LEAKS</font><font color="#00ffff">*/</font>
+
+  <font color="#ffff00">if</font> (input.bad_count)
+    status = <font color="#ffff00">2</font>;
+
+  <font color="#ffff00">return</font> status;
+}
+</pre>
+</body>
+</html>

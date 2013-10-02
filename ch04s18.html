@@ -1,0 +1,85 @@
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"><title>Интерактивная sed.</title><link rel="stylesheet" href="chs/default.css" type="text/css"><meta name="generator" content="DocBook XSL Stylesheets V1.75.1"><link rel="home" href="index.html" title="Краткий учебник по sed."><link rel="up" href="ch04.html" title="Глава 4. Примеры скриптов."><link rel="prev" href="ch04s17.html" title="Примеры из практики."><link rel="next" href="ch05.html" title="Глава 5. Справочные материалы."></head><body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF"><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">Интерактивная sed.</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="ch04s17.html">Пред.</a> </td><th width="60%" align="center">Глава 4. Примеры скриптов.</th><td width="20%" align="right"> <a accesskey="n" href="ch05.html">След.</a></td></tr></table><hr></div><div class="section" title="Интерактивная sed."><div class="titlepage"><div><div><h3 class="title"><a name="id2527337"></a>Интерактивная sed.</h3></div></div></div><div class="section" title="Вступление."><div class="titlepage"><div><div><h4 class="title"><a name="id2527342"></a>Вступление.</h4></div></div></div><p>
+				Вот в VIM'е можно задать команду <span class="command"><strong>:s/i/Z/gc</strong></span>, что приведёт к тому, что vim будет спрашивать после каждой команды подтверждения. Это всё отлично, но как быть, если хочется подтверждения от sed? Ишь чё захотели! sed - <span class="emphasis"><em>неинтерактивный</em></span> редактор, а значит нифига у вас не получится!
+			</p><p>
+				И тем не менее: стал-бы я делать новую главу, если-бы мне нечего было сказать? Нет конечно! На самом деле, sed может всё. В том числе и стать интерактивной. Просто нужно уметь её готовить ;-) Итак, для начала разберёмся с проблемами, которые нас подстерегают.
+			</p></div><div class="section" title="Почему не получается использовать sed в интерактивном режиме?"><div class="titlepage"><div><div><h4 class="title"><a name="id2527387"></a>Почему не получается использовать sed в интерактивном режиме?</h4></div></div></div><p>
+				На самом деле проблема всего одна, но она практически непреодолимая: мы имеем два выходных потока (стандартный, и поток ошибок), но входной поток всего один. Спрашивается, откуда sed узнает, что юзверь собственно хочет? Это в принципе можно обойти: достаточно кормить sed файлами, и заставить её внутри скрипта читать команды от юзера из стандартного входного потока. Команда <span class="command"><strong>r</strong></span> нам не подходит, ибо она хоть и неплохо читает, но совсем не туда пишет (нам надо писать во внутренний буфер, а она пишет в выходной поток). Но можно использовать ту-же <span class="command"><strong>read</strong></span> из bash. Читать можно из файла <code class="filename">/dev/fd/0</code>. Однако, я даже и рассматривать этот вариант не буду (во всяком случае, не сегодня). Есть способ лучше: использовать GUI.
+			</p></div><div class="section" title="GUI и sed, или как я скрестил ежа с ужом."><div class="titlepage"><div><div><h4 class="title"><a name="id2527450"></a>GUI и sed, или как я скрестил ежа с ужом.</h4></div></div></div><p>
+				Сам заголовок довольно неожиданный, вам не кажется? А тем не менее, ничего сложного тут нет: существуют аж 3 программы (как минимум) позволяющие прикрутить к CLI GUI. Я не стану рассматривать самую примитивную из них - <span class="command"><strong>xmessage</strong></span>, а сразу перейду к утилитке <span class="command"><strong>gmessage</strong></span>. Это довольно простая утилитка, и тем не менее, её возможностей нам вполне хватит. Как видно из названия, утилита выводит сообщение юзеру. Как из названия не видно, она ещё и ожидает его ответа. По умолчанию имеется лишь одна кнопка "ОК", но это только по умолчанию. Приступим к её настройке:
+			</p></div><div class="section" title="Настройка gmessage."><div class="titlepage"><div><div><h4 class="title"><a name="id2527491"></a>Настройка gmessage.</h4></div></div></div><p>
+				Сначала gmessage надо установить (если она конечно не установлена), эта утилитка входит в состав GTK, но её можно скачать и отдельно. Как её ставить - без понятия, у меня есть пакет для Slacky, который я собрал ещё для Slackware 10.2, и который, тем не менее, отлично работает и сегодня, в 13й слаке. Пользователи других дистрибутивов несомненно лучше меня знают, как ставить пакеты в их любимой ОС. А настраивается эта утилитка как обычно: копируем в свой домашний каталог настроечный файл:
+				</p><pre class="screen">
+					$ cp /usr/local/share/gmessagerc ~/.gmessagerc
+				</pre><p>
+				А теперь его правим. Впрочем править там особо и нечего, достаточно выбрать какой-нить фонт, лично я выбрал первый попавшийся моноширный (только надо брать именно моноширный!, а то жутко не удобно этим пользоваться, хотя и красиво). Вообще говоря, фонты дело субъективное, и тут вы сами выбирайте, кому что нравится. Теперь запустим программу:
+			</p><p>
+				</p><pre class="screen">
+					$ gmessage 'Hello World!'
+				</pre><p>
+				Мы увидим что-то вроде:
+				</p><div class="figure"><a name="id2527562"></a><p class="title"><b>Рисунок 4.15. Проверка работы gxmessage.</b></p><div class="figure-contents"><div><img src="img/snapshot44.png" alt="Проверка работы gxmessage."></div></div></div><p><br class="figure-break">
+				Конечно оформление окошка будет сделанно по вашему вкусу. Теперь посмотрим, что ещё умеет эта софтина:
+				</p><pre class="screen">
+$ gmessage --help
+Usage:	gmessage [OPTIONS] string...
+		gmessage [OPTIONS] --file filename|-
+Displays STRING or the contents of FILENAME in a window.
+
+	--file filename          file to read from, "-" for stdin.
+	--buttons string         comma-separated list of label:exitcode.
+	--default button         button to activate if Return is pressed.
+	--title title            title for main window.
+	--print                  print the button label to stdout when selected.
+	--center                 pop up at center of screen.
+	--nearmouse              pop up near mouse cursor.
+	--timeout secs           exit after "sec" seconds with default status.
+	--help                   print this message and exit.
+	--version                show version information and exit.
+
+All options may be specified with "-" instead of "--", for
+compatibility with xmessage.
+If a file is used, non option arguments are not accepted.
+The center option overrides nearmouse.
+				</pre><p>
+				В принципе, вполне достаточно для наших целей.
+			</p><p>
+				</p><div class="note" title="Замечание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Замечание</h3>
+					Да, забыл сказать: возможно у вас не заработают русские буквы - это связано с набором фонтов. У меня вот что-то не нашлось юникодного фонта, пришлось использовать koi8-r, и перекодировать при необходимости. Возможно плохо искал...
+				</div><p>
+			</p></div><div class="section" title="Интерактивный скрипт на sed."><div class="titlepage"><div><div><h4 class="title"><a name="id2527620"></a>Интерактивный скрипт на sed.</h4></div></div></div><p>
+				Я специально взял очень простую задачу: заменить буквы <span class="quote">&#171;<span class="quote">i</span>&#187;</span> на <span class="quote">&#171;<span class="quote">Z</span>&#187;</span>, вы безусловно переделаете как оно вам надо, это уже частности. Сам скрипт получился совсем простой:
+				</p><div class="example"><a name="id2527645"></a><p class="title"><b>Пример 4.21. </b></p><div class="example-contents"><a class="ulink" href="examples/sub.sed" target="_top">sub.sed</a><pre class="programlisting">
+#!/bin/sed -rf
+
+/i/{
+	h
+	s/.*/Old string: '&amp;'/w sub.tpl
+	g
+	s/i/Z/g
+	s/.*/New string: '&amp;'/w sub.tpl
+	s/.*/Substitute?/w sub.tpl
+	s~.*~gmessage --file sub.tpl --title sub.sed --buttons Yes:0,No:67,Cancel:68; echo $?~e
+	/^0$/{
+		g
+		s/i/Z/g
+		b
+	}
+	/^67$/{
+		g
+		b
+	}
+	Q
+}
+
+					</pre></div></div><p><br class="example-break">
+				Основная идея скрипта: создать шаблон, который потом отдаётся команде gmessage, и выводится на экран. Шаблон (<code class="filename">sub.tpl</code> создаётся при первом совпадении, используя модификатор <code class="option">w</code> команды <span class="command"><strong>s</strong></span>.
+				</p><div class="note" title="Замечание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Замечание</h3>
+					В <a class="link" href="ch06s03.html#info_w">info sed</a> про этот модификатор сказано, что файл усекается перед записью до нулевой длинный, на самом деле, это не совсем так: файл усекается лишь при первой записи, далее sed добавляет туда строчки.
+				</div><p>
+				В шаблон записываются всего три строчки: старая строка, новая, и собственно вопрос. При этом старые строки не удаляются. Юзеру доступны три кнопки: да, нет, и отмена. Выглядит это примерно так:
+				</p><div class="figure"><a name="id2527718"></a><p class="title"><b>Рисунок 4.16. Интерактивная замена sed.</b></p><div class="figure-contents"><div><img src="img/snapshot45.png" alt="Интерактивная замена sed."></div></div></div><p><br class="figure-break">
+			</p></div><div class="blockquote"><blockquote class="blockquote"><p>
+		Вы можете обсудить этот документ на <a class="ulink" href="http://emulek.tk/forum/viewtopic.php?f=19&amp;t=5026" target="_top">форуме</a>. Текст предоставляется по лицензии <a class="ulink" href="http://www.gnu.org/licenses/fdl.html" target="_top">GNU Free Documentation License</a> (<a class="ulink" href="http://forum.lorcode.org/viewtopic.php?f=15&amp;t=30" target="_top">Перевод лицензии GFDL</a>).
+	</p><p>
+		Вы можете пожертвовать небольшую сумму яндекс-денег на счёт <span class="command"><strong>41001666004238</strong></span> для оплаты хостинга, интернета, и прочего. Это конечно добровольно, однако это намного улучшит данный документ (у меня будет больше времени для его улучшения). На самом деле, проект часто находится на грани закрытия, ибо никаких денег никогда не приносил, и приносить не будет. Вы можете мне помочь. Спасибо.
+	</p></blockquote></div></div><div class="navfooter"><hr><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch04s17.html">Пред.</a> </td><td width="20%" align="center"><a accesskey="u" href="ch04.html">Уровень выше</a></td><td width="40%" align="right"> <a accesskey="n" href="ch05.html">След.</a></td></tr><tr><td width="40%" align="left" valign="top">Примеры из практики. </td><td width="20%" align="center"><a accesskey="h" href="index.html">Начало</a></td><td width="40%" align="right" valign="top"> Глава 5. Справочные материалы.</td></tr></table></div></body></html>

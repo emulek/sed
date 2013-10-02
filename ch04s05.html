@@ -1,0 +1,101 @@
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"><title>Подсчёт количества вхождений каждого символа в тексте.</title><link rel="stylesheet" href="chs/default.css" type="text/css"><meta name="generator" content="DocBook XSL Stylesheets V1.75.1"><link rel="home" href="index.html" title="Краткий учебник по sed."><link rel="up" href="ch04.html" title="Глава 4. Примеры скриптов."><link rel="prev" href="ch04s04.html" title="Просмотр логов (базы данных в sed)."><link rel="next" href="ch04s06.html" title="Использование внешних утилит."></head><body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF"><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">Подсчёт количества вхождений каждого символа в тексте.</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="ch04s04.html">Пред.</a> </td><th width="60%" align="center">Глава 4. Примеры скриптов.</th><td width="20%" align="right"> <a accesskey="n" href="ch04s06.html">След.</a></td></tr></table><hr></div><div class="section" title="Подсчёт количества вхождений каждого символа в тексте."><div class="titlepage"><div><div><h3 class="title"><a name="id2520412"></a>Подсчёт количества вхождений каждого символа в тексте.</h3></div></div></div><p>
+			В <a class="link" href="ch04s04.html#t06_1">прошлом примере</a> мы считали слова в тексте, а сейчас посчитаем символы.
+		</p><p>
+			</p><div class="example"><a name="id2520434"></a><p class="title"><b>Пример 4.2. </b></p><div class="example-contents"><pre class="programlisting">#!/bin/sed -rnf
+
+/^$/ b ctrl_end
+
+G
+:begin_loop
+		s/^([^\n])([^\n]*)(.*)\n\1~([a-g]+)/\2\n\1~\4a\3/
+		t continue_loop
+		# символа нет в базе или этот символ последний
+		/^\n/	b last_sym
+
+		# новый символ
+		s/^(.)([^\n]*)\n$/\2\n\1~a/
+		t begin_loop
+		s/^(.)(.*)$/\2\n\1~a/
+		t begin_loop
+
+:continue_loop
+		s/(\n.*)a{10}/\1b/;	T begin_loop
+		s/(\n.*)b{10}/\1c/;	T begin_loop
+		s/(\n.*)c{10}/\1d/;	T begin_loop
+		s/(\n.*)d{10}/\1e/;	T begin_loop
+		s/(\n.*)f{10}/\1g/;	T begin_loop
+		s/(\n.*)g{10}/\1i/;	T begin_loop
+		q 77
+
+	:last_sym
+	# последний символ
+	s///
+	x
+
+:ctrl_end
+$ {
+	# последняя строка
+	s/.*/&amp;/
+	t convert_start
+:convert_loop
+		s/a{9}/9/;		t convert_end_loop
+		s/a{8}/8/;		t convert_end_loop
+		s/a{7}/7/;		t convert_end_loop
+		s/a{6}/6/;		t convert_end_loop
+		s/a{5}/5/;		t convert_end_loop
+		s/a{4}/4/;		t convert_end_loop
+		s/a{3}/3/;		t convert_end_loop
+		s/a{2}/2/;		t convert_end_loop
+		s/a/1/;			t convert_end_loop
+		s/^[a-g]*/&amp;0/;	t convert_end_loop
+:convert_end_loop
+		y/bcdefg/abcdef/
+		s/[a-g]/&amp;/
+		t convert_loop
+	G
+	s/^([0-9]+)\n(.*)([^\n])~[a-g]+(.*)/\2'\3' \1\4/
+	x
+	t convert_start
+	:convert_start
+	g
+	s/.*[^\n]~([a-g]+).*/\1/
+	t convert_loop
+	s/\n([^\n]+)\n([^\n]+)\n/\t\1\t\2\n/g
+	p
+}</pre></div></div><p><br class="example-break">
+		</p><p>
+			Вот что получается:
+			</p><pre class="screen">$ ./wcc.sed sed/sed_tutor/test.txt
+'.' 13  'е' 102 'к' 48
+'у' 18  'б' 24  'т' 92
+'о' 138 'н' 67  ' ' 231
+'а' 109 'щ' 5   'в' 70
+'и' 92  'л' 34  'ы' 23
+'ш' 5   'м' 36  'й' 10
+'ч' 28  'р' 58  'с' 77
+'д' 29  'ь' 26  'х' 8
+',' 15  'г' 15  'я' 26
+'п' 37  ':' 2   'x' 12
+'u' 12  'n' 21  'i' 22
+'L' 12  'з' 22  'ю' 4
+'В' 3   'ц' 7   'э' 3
+'ж' 7   'ё' 7   ')' 3
+'(' 3   'o' 12  't' 3
+'s' 10  'r' 4   'W' 9
+'e' 2   'S' 2   'w' 8
+'d' 8   'ф' 3   '-' 3
+'М' 2   'X' 2   'I' 2
+'N' 2   'U' 2   '?' 1
+'И' 1   'О' 1   'Д' 1
+'M' 1   'c' 1   'f' 1
+'D' 1   'O' 1   'Т' 1
+'Н' 1   'Е' 1   'v' 1
+'С' 1   'k' 1   'a' 1
+'Р' 1
+'У' 1
+			</pre><p>
+		</p><div class="blockquote"><blockquote class="blockquote"><p>
+		Вы можете обсудить этот документ на <a class="ulink" href="http://emulek.tk/forum/viewtopic.php?f=19&amp;t=5026" target="_top">форуме</a>. Текст предоставляется по лицензии <a class="ulink" href="http://www.gnu.org/licenses/fdl.html" target="_top">GNU Free Documentation License</a> (<a class="ulink" href="http://forum.lorcode.org/viewtopic.php?f=15&amp;t=30" target="_top">Перевод лицензии GFDL</a>).
+	</p><p>
+		Вы можете пожертвовать небольшую сумму яндекс-денег на счёт <span class="command"><strong>41001666004238</strong></span> для оплаты хостинга, интернета, и прочего. Это конечно добровольно, однако это намного улучшит данный документ (у меня будет больше времени для его улучшения). На самом деле, проект часто находится на грани закрытия, ибо никаких денег никогда не приносил, и приносить не будет. Вы можете мне помочь. Спасибо.
+	</p></blockquote></div></div><div class="navfooter"><hr><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch04s04.html">Пред.</a> </td><td width="20%" align="center"><a accesskey="u" href="ch04.html">Уровень выше</a></td><td width="40%" align="right"> <a accesskey="n" href="ch04s06.html">След.</a></td></tr><tr><td width="40%" align="left" valign="top">Просмотр логов (базы данных в sed). </td><td width="20%" align="center"><a accesskey="h" href="index.html">Начало</a></td><td width="40%" align="right" valign="top"> Использование внешних утилит.</td></tr></table></div></body></html>

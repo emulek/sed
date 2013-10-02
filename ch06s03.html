@@ -1,0 +1,362 @@
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"><title>Команды sed</title><link rel="stylesheet" href="chs/default.css" type="text/css"><meta name="generator" content="DocBook XSL Stylesheets V1.75.1"><link rel="home" href="index.html" title="Краткий учебник по sed."><link rel="up" href="ch06.html" title="Глава 6. info sed. (русский перевод)."><link rel="prev" href="ch06s02.html" title="Программирование в sed."><link rel="next" href="ch06s04.html" title="GNU Расширения регулярных выражений."></head><body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF"><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">Команды sed</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="ch06s02.html">Пред.</a> </td><th width="60%" align="center">Глава 6. info sed. (русский перевод).</th><td width="20%" align="right"> <a accesskey="n" href="ch06s04.html">След.</a></td></tr></table><hr></div><div class="section" title="Команды sed"><div class="titlepage"><div><div><h3 class="title"><a name="id2535098"></a>Команды sed</h3></div></div></div><div class="section" title="Основные команды(#,q,d,p,n,{},s)."><div class="titlepage"><div><div><h4 class="title"><a name="id2535102"></a>Основные команды(#,q,d,p,n,{},s).</h4></div></div></div>
+			Если вы используете 'sed', вы обязаны знать эти команды:
+			<div class="variablelist"><dl><dt><span class="term"><span class="command"><strong>#</strong></span></span></dt><dd><p>[без адреса]</p><p>
+							Символ '#' служит для обозначения комментария. Комментарий длится от символа "#", и до конца строки. Для переносимости, самый первый символ скрипта может быть "#".
+							</p><div class="caution" title="Предостережение" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Предостережение</h3>
+								Если первые 2 символа комментария "#n", то их sed будет считать как опцию -n (без вывода), если вам нужен такой комментарий, используйте "# n" или "#N".
+								<div class="note" title="Замечание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Замечание</h3>
+									(drBatty) Что касается самой первой строки, то я там ставлю sha-bang
+									<pre class="programlisting">#!/bin/sed -rf</pre>
+									после чего, я могу запускать свои скрипты, как обычные команды (./my_sed_script во время отладки, а перенеся их в /usr/local/bin/, просто набрав my_sed_script). Оболочка сама определяет, что это sed-скрипт и выполняет его. Таким скриптом можно пользоваться как и обычной sed, например:
+									<div class="orderedlist"><ol class="orderedlist" type="1"><li class="listitem"><pre class="screen">$ cat input.txt | my_sed_script &gt; output.txt</pre>
+											я вывожу в stdout входной файл(input.txt), он обрабатывается моим скриптом, и записывается в output.txt
+										</li><li class="listitem"><pre class="screen">$ my_sed_script input.txt &gt; output.txt</pre>
+											тоже самое, что и в п1, просто тут сам скрипт читает файлы
+										</li><li class="listitem"><pre class="screen">$ my_sed_script test.txt -i.bak</pre>
+											Редактирование "на месте", отредактированный файл записывается ВМЕСТО test.txt, при этом, старый файл сохраняется под именем "test.txt.bak".
+										</li><li class="listitem"><pre class="screen">$ my_sed_script *.html -ibackup_dir/*</pre>
+											В данном случае, оболочка выдаёт моему скрипту все html файлы, которые скрипт последовательно обрабатывает(каждый отдельно, см. описание -i выше). При этом, старые файлы сохраняются в каталоге backu_dir(если он есть и доступен).
+										</li></ol></div>
+									Что касается "#n", то лично у меня это НЕ работает. Возможно, это связано с sha-bang, а может ещё с чем-то. Конечно, лучше не ставить таких комментов. Я, для себя, взял за правило: ВСЕГДА ставить после # пробел(ну конечно кроме sha-bang)
+								</div></div><p>
+						</p></dd><dt><span class="term"><a name="info_q"></a><span class="command"><strong>q</strong></span> <span class="emphasis"><em>[EXIT-CODE]</em></span></span></dt><dd><p>Эта команда принимает только один адрес.</p><p>
+							Прерывание работы скрипта. Если не запрещён автоматический вывод буфера (без опции -n), буфер выводится в выходной поток. Можно дополнительно задать код завершения (<span class="emphasis"><em>EXIT-CODE</em></span>). (это GNU расширение).
+						</p></dd><dt><span class="term"><a name="info_d"></a><span class="command"><strong>d</strong></span></span></dt><dd><p>
+							Удаляет содержимое буфера; после чего переходит к следующему циклу.
+							</p><div class="note" title="Замечание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Замечание</h3>
+								(drBatty): таким образом, эта команда примерно эквивалентна
+								<pre class="programlisting">{ s/.*//; b }</pre>
+								но при этом, ничего не выводится, все команды после d не выполняются. (потому сложно сказать, действительно-ли очищается буфер) конечно "sed '5d'" действительно отфильтрует пятую строку, но при этом, следует помнить, что не всё так просто...
+								<a class="link" href="ch02s03.html#ddd">См. также.</a></div><p>
+						</p></dd><dt><span class="term"><a name="info_p"></a><span class="command"><strong>p</strong></span></span></dt><dd><p>
+							Печать буфера (в stdout). Эту команду имеет смысл использовать только при использовании опции -n.
+							</p><div class="note" title="Замечание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Замечание</h3><p>
+									в моей версии sed применение этой команды без опции -n приводит к дублированию строк, в оригинале написано, что другие версии могут печатать только один раз, а стандарт POSIX трактует это как ошибку.
+								</p><p>
+									Потому в переносимых скриптах НЕ СЛЕДУЕТ использовать команду p без ключа -n (это касается так-же модификатора p команды s).
+								</p></div><p>
+						</p><p>
+							</p><div class="tip" title="Подсказка" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Подсказка</h3>
+								(drBatty): что-же делать, если надо вывести строку 2 раза? ИМХО необходимо использовать опцию -n, и в случае дублирования дублировать команду p. Примитивный пример:
+								<pre class="programlisting">sed -n 'p;p'</pre></div><p>
+						</p></dd><dt><span class="term"><a name="info_n"></a><span class="command"><strong>n</strong></span></span></dt><dd><p>
+							Если авто-печать не отключена, печатает буфер, и затем заменяет содержимое буфера на следующую строку. Если авто-печать отключена (опция -n), то просто меняет содержимое буфера на следующую строку. Если следующей строки нет(текущая - последняя в тексте), то эта команда просто выводит содержимое буфера (если это разрешено), и работа скрипта завершается(следующие за n команды НЕ выполняются).
+						</p></dd><dt><span class="term"><span class="command"><strong>{ COMMANDS }</strong></span></span></dt><dd><p>
+							Группировка команд в блок. Вы можете использовать такие блоки, если хотите, что-бы некоторые команды выполнялись только для некоторых адресов(или диапазонов). Пример:
+							</p><pre class="programlisting">sed -n '3p;p'</pre><p>
+							эта команда будет просто печатать все строки, так-как 3p игнорируется для всех строк, однако, для третей строки команда 3p выполнится. (третья будет распечатана 2 раза).
+							</p><pre class="programlisting">sed -n '3{p;p}'</pre><p>
+							Ничего не распечатает, кроме третьей строки, которая выведется дважды.
+						</p><p>
+							</p><div class="note" title="Замечание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Замечание</h3>
+								Вообще-то говоря, { является <span class="command"><strong>командой</strong></span>, и это нужно учитывать.
+							</div><p>
+						</p></dd><dt><span class="term"><a name="info_s"></a><span class="command"><strong>s</strong></span></span></dt><dd><p>
+							Команда 's' является самой востребованной в sed-скриптах, это команда замены. Точнее будет сказать, это команда поиска, и(если найдено) замены. Синтаксис команды:
+							</p><pre class="programlisting">s/<span class="emphasis"><em>РЕГУЛЯРНОЕ_ВЫРАЖЕНИЕ</em></span>/<span class="emphasis"><em>ВЫРАЖЕНИЕ_ДЛЯ_ЗАМЕНЫ/МОДИФИКАТОРЫ</em></span></pre><p>
+							Символ '/' разделяет части команды. Его можно поменять на любой другой символ. Если в <span class="emphasis"><em>РЕГУЛЯРНОМ_ВЫРАЖЕНИИ</em></span> или в <span class="emphasis"><em>ВЫРАЖЕНИИ_ДЛЯ_ЗАМЕНЫ</em></span> требуется использовать символ-разделитель('/' обычно), то его следует за экранировать.
+						</p><p>
+							Базовая концепция 's' проста: она ищет <span class="emphasis"><em>РЕГУЛЯРНОЕ_ВЫРАЖЕНИЕ</em></span>, и, если его найдёт, заменяет найденное на <span class="emphasis"><em>ВЫРАЖЕНИЕ_ДЛЯ_ЗАМЕНЫ</em></span>.
+						</p><p>
+							<span class="emphasis"><em>ВЫРАЖЕНИЕ_ДЛЯ_ЗАМЕНЫ</em></span> может содержать `\N' (где N - цифра 1...9), эта "обратная ссылка" заменяется на подвыражение (в скобках) из <span class="emphasis"><em>РЕГУЛЯРНОЕ_ВЫРАЖЕНИЕ</em></span>. Выражения нумеруются слева-направо. Если <span class="emphasis"><em>ВЫРАЖЕНИЕ_ДЛЯ_ЗАМЕНЫ</em></span> содержит '&amp;', то он заменяется на всю найденную строку.
+						</p><p>
+							</p><div class="note" title="Замечание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Замечание</h3>
+								(drBatty): аналогично '&amp;' работает '\0'. По этой причине, в <span class="emphasis"><em>ВЫРАЖЕНИЕ_ДЛЯ_ЗАМЕНЫ</em></span> (впрочем и в <span class="emphasis"><em>РЕГУЛЯРНОЕ_ВЫРАЖЕНИЕ</em></span>) невозможно использовать октальные символы в Си-стиле (вроде \033). Они воспринимаются как обратные ссылки на всю строку. Для использования символов с восьмеричным кодом вы можете использовать конструкцию \oQQQ, где QQQ - восьмеричные цифры.
+							</div><p>
+						</p><p>
+							Перед обратными ссылками(<span class="quote">&#171;<span class="quote">\N</span>&#187;</span>  и  <span class="quote">&#171;<span class="quote">&amp;</span>&#187;</span>) вы можете поставить префикс, один из <code class="option">\L</code>, <code class="option">\l</code>, <code class="option">\U</code>, <code class="option">\u</code>, или <code class="option">\E</code>.  Впрочем, они работают для всего <span class="emphasis"><em>ВЫРАЖЕНИЯ_ДЛЯ_ЗАМЕНЫ</em></span> Смысл этих префиксов:
+							</p><div class="variablelist"><dl><dt><span class="term"><code class="option">\L</code></span></dt><dd>
+										Заменяет БОЛЬШИЕ буквы на маленькие. Действует до <code class="option">\U</code> или до <code class="option">\E</code></dd><dt><span class="term"><code class="option">\l</code></span></dt><dd>Заменяет один следующий символ на мАЛЕНЬКИЙ.</dd><dt><span class="term"><code class="option">\U</code></span></dt><dd>Заменяет все следующие символы на БОЛЬШИЕ, действует до <code class="option">\L</code> или до <code class="option">\E</code>.</dd><dt><span class="term"><code class="option">\u</code></span></dt><dd>Заменяет один сл. символ на Большой</dd><dt><span class="term"><code class="option">\E</code></span></dt><dd>Остановка замены регистров начатых префиксами <code class="option">\L</code> и <code class="option">\U</code>.</dd></dl></div><p>
+							<a class="link" href="ch04s08.html#upper">Пример использования префиксов.</a>
+						</p><p>
+							В оригинале написано, что <span class="quote">&#171;<span class="quote">\</span>&#187;</span>, <span class="quote">&#171;<span class="quote">&amp;</span>&#187;</span>, и перевод строки останавливают замену, однако, у меня эти символы не останавливают конвертацию регистра.
+							</p><div class="note" title="Замечание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Замечание</h3>
+								Не останавливают конечно. Вопрос - конвертировать или нет решается в зависимости от флага конвертации. А этот флаг сбрасывается в 0 для каждой <span class="emphasis"><em>замены</em></span>.
+								<pre class="screen">$ echo "ABC XYZ" | sed -r 's/\&lt;\w+\&gt;/\L\u&amp;/g'
+Abc Xyz</pre>
+								Тут произошло две замены, и для каждой флаги преобразования регистра были установлены заново - сначала для найденного <span class="quote">&#171;<span class="quote">ABC</span>&#187;</span>, а затем для <span class="quote">&#171;<span class="quote">XYZ</span>&#187;</span>.
+							</div><p>
+						</p><p>
+							Для команды <span class="command"><strong>s</strong></span> предусмотрено множество <span class="emphasis"><em>МОДИФИКАТОРОВ</em></span>:
+						</p><p>
+							</p><div class="variablelist"><dl><dt><span class="term"><code class="option">g</code></span></dt><dd>Производится замена <span class="emphasis"><em>всех</em></span> найденных вхождений <span class="emphasis"><em>РЕГУЛЯРНОГО_ВЫРАЖЕНИЯ</em></span>. (по умолчанию - только первое вхождение заменяется).</dd><dt><span class="term"><code class="option">НОМЕР</code></span></dt><dd>
+										Заменяется только заданное <span class="emphasis"><em>НОМЕР</em></span>ом найденное вхождение <span class="emphasis"><em>РЕГУЛЯРНОГО_ВЫРАЖЕНИЯ</em></span>.
+										<div class="note" title="Замечание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Замечание</h3>
+											Примечание: POSIX стандарт не описывает ситуацию комбинирования <span class="emphasis"><em>МОДИФИКАТОРОВ</em></span><code class="option">g</code> и <code class="option">НОМЕР</code>, GNU версия sed обрабатывает такую комбинацию сл. образом: Игнорируются все совпадения до совпадения <code class="option">НОМЕР</code>, а начиная с совпадения <code class="option">НОМЕР</code> все заменяются. Думаю нужны примеры в данном случае:
+											<pre class="screen">$ echo 'ABCDEFGH' | sed 's/./-/'
+-BCDEFGH
+# по умолчанию заменяется только первое вхождение РЕГУЛЯРНОГО_ВЫРАЖЕНИЯ
+$ echo 'ABCDEFGH' | sed 's/./+/g'
+++++++++
+# с МОДИФИКАТОРОМ g заменяются все вхождения
+$ echo 'ABCDEFGH' | sed 's/./+/4'
+ABC+EFGH
+# с МОДИФИКАТОРОМ НОМЕР заменяется только заданное вхождение(здесь - четвёртое)
+$ echo 'ABCDEFGH' | sed 's/./+/4g'
+ABC+++++
+# комбинация МОДИФИКАТОРОВ 'g' и 'НОМЕР'
+# здесь заменились вхождения 4,5,6,7, и 8.</pre></div></dd><dt><span class="term"><code class="option">p</code></span></dt><dd>
+										Если <span class="emphasis"><em>РЕГУЛЯРНОЕ_ВЫРАЖЕНИЕ</em></span> найдено, то происходит вывод буфера в выходной поток.
+										<div class="note" title="Замечание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Замечание</h3>
+											Если вы используете сразу два МОДИФИКАТОРА <code class="option">p</code> и <code class="option">e</code>, то от их порядка зависит результат. Например:
+											<pre class="screen">$ echo 'ABCDEFGH' | sed -n 's/.*/echo TEST/p'
+echo TEST
+# пример использования 'p' - простой вывод буфера.
+$ echo 'ABCDEFGH' | sed -n 's/.*/echo TEST/e'
+# МОДИФИКАТОР 'e' - команда выполняется, но её результат остаётся в буфере
+# возможна её дальнейшая обработка другими командами sed. Например:
+$ echo 'ABCDEFGH' | sed -n 's/.*/echo TEST/e;s/T/Q/p'
+QEST
+# первая команда 's' вывела в буфер слово TEST(при этом мы ничего не увидели),
+# а вторая команда заменила T на Q, и вывела буфер.
+$ echo 'ABCDEFGH' | sed -n 's/.*/echo TEST/ep'
+TEST
+# (МОДИФИКАТОР выполнить и распечатать), тут команда выполнилась, и мы видим результат
+# её работы. Обычно это и нужно.
+$ echo 'ABCDEFGH' | sed -n 's/.*/echo TEST/pe'
+echo TEST
+# (МОДИФИКАТОРЫ распечатать и выполнить) здесь сначала команда распечаталась,
+# а потом выполнилась. Результат её работы сохранён в буфере, для дальнейшей обработки.
+$ echo 'ABCDEFGH' | sed -n 's/.*/echo TEST/pep'
+sed: -e выражение #1, символ 18: несколько модификаторов `p' с командой `s'
+# а вот такое недопустимо.
+# если вы хотите распечатать-выполнить-распечатать, напишите `p' отдельной командой:
+$ echo 'ABCDEFGH' | sed -n 's/.*/echo TEST/pe;p'
+echo TEST
+TEST</pre><div class="note" title="Замечание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Замечание</h3>
+												В данном примере используется неверное применение замены модификатора <code class="option">pep</code> (который не поддерживается). Более правильным будет использование команды <span class="command"><strong>T</strong></span> после команды <span class="command"><strong>s///pe</strong></span>.
+											</div></div></dd><dt><span class="term"><a name="info_sw"></a><code class="option">w <span class="emphasis"><em>FILE-NAME</em></span></code></span></dt><dd>
+										выводит содержимое буфера в <span class="emphasis"><em>FILE-NAME</em></span>. Расширение GNU: допустимо использовать специальные устройства <code class="filename">/dev/stderr</code>, и <code class="filename">/dev/stdout</code>.
+									</dd><dt><span class="term"><code class="option">e</code></span></dt><dd>
+										Этот <span class="emphasis"><em>МОДИФИКАТОР</em></span> выполняет команду из буфера. Команда выполняется как отдельный процесс, вроде вызова по конвейеру. См. примечания к <code class="option">МОДИФИКАТОРУ p</code> Команда завершается символом новой строки, если она завершается <span class="quote">&#171;<span class="quote">\000</span>&#187;</span>, то результат работы не определён. Это расширение GNU.
+									</dd><dt><span class="term"><code class="option">I, i</code></span></dt><dd>
+										Этот модификатор заставляет считать БОЛЬШИЕ и малые буквы при поиске <span class="emphasis"><em>РЕГУЛЯРНОГО_ВЫРАЖЕНИЯ</em></span> эквивалентными. Это расширение GNU.
+									</dd><dt><span class="term"><code class="option">M, m</code></span></dt><dd>
+										Поиск РЕГУЛЯРНОГО_ВЫРАЖЕНИЯ в многострочном режиме. См. описание одноимённого модификатора адресного выражения.
+									</dd></dl></div><p>
+						</p></dd></dl></div></div><div class="section" title="Другие команды(y,a,i,c,=,l,r,w,D,N,P,h,H,g,G,x)."><div class="titlepage"><div><div><h4 class="title"><a name="id2536140"></a>Другие команды(y,a,i,c,=,l,r,w,D,N,P,h,H,g,G,x).</h4></div></div></div><p>
+				Многие sed-скрипты используют только команду <span class="command"><strong>s</strong></span>, описанную в прошлой секции, однако, не стоит забывать, что sed умеет намного больше простой замены. Вот список часто используемых команд <span class="command"><strong>sed</strong></span>:
+			</p><p>
+				</p><div class="variablelist"><dl><dt><span class="term"><span class="command"><strong><a name="info_y"></a>y</strong></span>/<span class="emphasis"><em>ЗАМЕНЯЕМЫЕ_СИМВОЛЫ</em></span>/<span class="emphasis"><em>ЗАМЕНЯЮЩИЕ_СИМВОЛЫ</em></span>/</span></dt><dd><p>
+								(в этой команде, при необходимости, разделитель <span class="quote">&#171;<span class="quote">/</span>&#187;</span> можно заменить на любой другой символ)
+							</p><p>
+								Эта команда заменяет символы из списка <span class="emphasis"><em>ЗАМЕНЯЕМЫЕ_СИМВОЛЫ</em></span>, на символы из списка <span class="emphasis"><em>ЗАМЕНЯЮЩИЕ_СИМВОЛЫ</em></span>. Списки <span class="emphasis"><em>должны быть</em></span> одинаковой длинны (после де-экранирования).
+							</p><p>
+								</p><div class="note" title="Замечание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Замечание</h3>
+									(drBatty): В отличие от perl'а и прочих языков, тут нельзя задавать диапазоны и всякие другие извраты. Всё должно быть предельно ясно:
+									<pre class="programlisting">y/ABC/XYZ/</pre>
+									эта команда меняет <span class="quote">&#171;<span class="quote">A</span>&#187;</span> на <span class="quote">&#171;<span class="quote">X</span>&#187;</span>, <span class="quote">&#171;<span class="quote">B</span>&#187;</span> на <span class="quote">&#171;<span class="quote">Y</span>&#187;</span>, и <span class="quote">&#171;<span class="quote">C</span>&#187;</span> на <span class="quote">&#171;<span class="quote">Z</span>&#187;</span>. Другие форматы не допускаются. Потому на sed невозможно написать классический "однострок на перле". Не думаю, что это большой минус. Хотя иногда приходится много кнопок давить :-(
+								</div><p>
+							</p><p>
+								</p><div class="warning" title="Внимание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Внимание</h3><p>
+										Ну и как обычно, я впишу красненький <span class="quote">&#171;<span class="quote">warning</span>&#187;</span>. Сама sed конечно не сможет исполнить <span class="quote">&#171;<span class="quote">однострок на перле</span>&#187;</span>, однако, вы всё-же будьте внимательны...
+									</p><p>
+										Глюки и баги могут возникнуть и сами по себе, к примеру <a class="link" href="ch02s04.html#bugs_utf">так</a>.
+									</p></div><p>
+							</p></dd><dt><span class="term"><a name="info_aci"></a><span class="command"><strong>a</strong></span> <span class="emphasis"><em>TEXT</em></span></span></dt><dd><p>
+								В режиме <span class="quote">&#171;<span class="quote">POSIXLY_CORRECT</span>&#187;</span>, эта команда имеет один адрес. В конце текущего цикла, в выходной поток добавляется <span class="emphasis"><em>TEXT</em></span>. Как расширение GNU, можно писать:
+								</p><pre class="screen">$ echo 'ABCDEFGH' | sed -n 'a text1\
+text2\
+text3\
+text4'
+text1
+text2
+text3
+text4</pre><p>
+										как видите, символы <span class="quote">&#171;<span class="quote">\</span>&#187;</span> удаляются (как и в языке Си).
+							</p><p>
+								Это расширение так-же работает и в командах <span class="command"><strong>i</strong></span> и <span class="command"><strong>c</strong></span>.
+							</p></dd><dt><span class="term"><span class="command"><strong>i</strong></span> <span class="emphasis"><em>TEXT</em></span></span></dt><dd>
+							Так-же как <span class="command"><strong>a</strong></span>, но <span class="emphasis"><em>TEXT</em></span> выводится перед выводом буфера.
+						</dd><dt><span class="term"><span class="command"><strong>c</strong></span> <span class="emphasis"><em>TEXT</em></span></span></dt><dd>
+							Так-же как <span class="command"><strong>a</strong></span>, но <span class="emphasis"><em>TEXT</em></span> выводится вместо выводам буфера.
+						</dd><dt><span class="term"><span class="command"><strong>=</strong></span></span></dt><dd>
+									Так-же как <span class="command"><strong>i</strong></span>, но выводится не заданный текст, а номер текущей строки. Пример:
+									<pre class="screen">$ echo 'ABCDEFGH' | sed  'a TEST'
+ABCDEFGH
+TEST
+$ echo 'ABCDEFGH' | sed  'i TEST'
+TEST
+ABCDEFGH
+$ echo 'ABCDEFGH' | sed  'c TEST'
+TEST
+$ echo 'ABCDEFGH' | sed  '='
+1
+ABCDEFGH</pre></dd><dt><span class="term"><a name="info_l"></a><span class="command"><strong>l</strong></span> [<span class="emphasis"><em>N</em></span>]</span></dt><dd><p>
+								Вывод буфера в переносимой форме: непечатные символы(а так-же <span class="quote">&#171;<span class="quote">\</span>&#187;</span>) выводится в Си-стиле (тремя восьмеричными цифрами, и перед ними добавляется <span class="quote">&#171;<span class="quote">\</span>&#187;</span>) Длинные строки разрезаются, при резке в конец новых строк добавляется <span class="quote">&#171;<span class="quote">\</span>&#187;</span>, Конец каждой строки помечается символом <span class="quote">&#171;<span class="quote">$</span>&#187;</span>.
+							</p><p>
+								<span class="emphasis"><em>N</em></span> определяет максимальный размер строки, если не задан, принимается значение заданное в командной строке <code class="option">ключом -l</code>, если и он не задан, <span class="emphasis"><em>N</em></span>=70. Если <span class="emphasis"><em>N</em></span>=0, строки не разбиваются. Параметр <span class="emphasis"><em>N</em></span> - расширение GNU.
+							</p></dd><dt><span class="term"><a name="info_r"></a><span class="command"><strong>r</strong></span> <span class="emphasis"><em>FILENAME</em></span></span></dt><dd><p>
+								Эта команда читает файл <span class="emphasis"><em>FILENAME</em></span> в конце текущего цикла (или перед чтение следующей строки), и выводит его содержимое в выходной поток. Если файл не удалось прочитать, или файл пустой, то ничего не происходит, и никаких сообщений об ошибке НЕ выводится. Пример:
+								</p><pre class="screen">$ cat z
+aaaaa
+# содержимое файла z
+$ echo 'ABCDEFGH' | sed  'r z
+s/./X/'
+XBCDEFGH
+aaaaa
+# сначала стоит команда r, а затем команда s,
+# однако мы видим, что sed выполняет команды не так, как мы их записали,
+# а в соответствии с этим документом:
+# СНАЧАЛА выполняется команда s, которая заменяет символ в буфере,
+# затем содержимое буфера выводится,
+# и лишь ПОСЛЕ этого, выполняется чтение и вывод файла (не думаю, что чтение
+# осуществляется ДО этого, в какую-то временную память).</pre><p>
+							</p><p>
+								В режиме <span class="quote">&#171;<span class="quote">POSIXLY_CORRECT</span>&#187;</span>, эта команда имеет только один адрес.
+							</p></dd><dt><span class="term"><a name="info_w"></a><span class="command"><strong>w</strong></span> <span class="emphasis"><em>FILENAME</em></span></span></dt><dd><p>
+								Записывает буфер в <span class="emphasis"><em>FILENAME</em></span>. См. так-же <a class="link" href="ch06s03.html#info_sw">описание модификатора</a> <code class="option">w</code> команды <span class="command"><strong>s</strong></span>.
+							</p><p>
+								Эта команда сначала создаёт файл (или, если уже есть, усекает его до нулевой длинны), а потому уже записывает. Если файл открыть не получилось, эта команда пытается его закрыть, и снова открыть. Если файл так и не открылся для записи, работа прерывается с сообщением об ошибке. Это так-же касается модификатора <code class="option">w</code> команды <span class="command"><strong>s</strong></span>.
+							</p></dd><dt><span class="term"><a name="info_dd"></a><span class="command"><strong>D</strong></span></span></dt><dd><p>
+								Это совсем мутная команда, здесь кардинальным образом нарушается вся работа sed:
+								</p><div class="orderedlist"><ol class="orderedlist" type="1"><li class="listitem">читаем строку из входного файла в буфер.</li><li class="listitem">выполняем скрипт до команды <span class="command"><strong>D</strong></span>.</li><li class="listitem">Выполняем команду <span class="command"><strong>D</strong></span>:
+										<div class="orderedlist"><ol class="orderedlist" type="a"><li class="listitem">
+												Первым делом удаляем из буфера все символы до первого <span class="quote">&#171;<span class="quote">\n</span>&#187;</span>. Т.е. всю строку, если в буфере 1 строка, и только первую, если строк много.
+											</li><li class="listitem">если в буфере пусто, то переходим к п1.</li><li class="listitem">если в буфере НЕ пусто, то переходим к п2.</li></ol></div></li><li class="listitem">
+										Никакие команды после <span class="command"><strong>D</strong></span>, а так-же никакая печать буфера после <span class="command"><strong>D</strong></span> НЕ выполняется.
+									</li></ol></div><p>
+							</p><p>
+								Таким образом, можно напихать в буфер множество строк, а после этого все это строки обработать по одной.  Весь скрипт получается таким своеобразным циклом, который не слишком и удобен, по той причине, что точка входа в цикл всего одна, и совпадает с началом скрипта.  Конечно, хотя точка входа единственная, точек выхода сколько угодно, и конечно эту команду всегда можно обойти.
+							</p><p>
+								<a class="link" href="ch07.html#info_uniq">Пример.</a>
+							</p><p>
+								</p><div class="note" title="Замечание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Замечание</h3>
+									Работа команды <span class="command"><strong>D</strong></span> оптимизирована - она вовсе не удаляет символы - она смещает указатель на начало строки за первый встреченный символ <span class="quote">&#171;<span class="quote">\n</span>&#187;</span>. По этой причине команда <span class="command"><strong>D</strong></span> часто работает намного быстрее, чем эквивалентная замена, вроде этой:
+									<pre class="programlisting">s/^[^\n]*\n//</pre><a class="link" href="ch02s03.html#ddd">См. также.</a></div><p>
+							</p></dd><dt><span class="term"><a name="info_nn"></a><span class="command"><strong>N</strong></span></span></dt><dd><p>
+								Добавляет новую строку из входного потока к буферу. Строки разделяются символом новой строки(\n). Если нет следующей строки, то работа sed завершается без выполнения оставшихся команд. Команда довольно мутная, поясню примером с прошлым файлом из двух строк:
+								</p><pre class="screen">$ sed 'N' 2l.txt
+line 1
+second line
+# никаких изменений, файл никак не поменялся,
+# но это только с виду.
+# на самом деле, выполнился только один цикл работы sed,
+# сначала загрузилась первая строка (как обычно), а затем - вторая,
+# командой N, затем содержимое буфера вывелось на экран.
+# но так-как строки разделены \n, это выглядит как и оригинальный вывод (например
+# командой cat)
+$ sed 'N;s/\n/WWW/' 2l.txt
+line 1WWWsecond line
+# можно заменить \n в буфере на что-то другое, и тогда станет видно, что в
+# действительности это просто одна строка, хотя и с символом \n в середине.</pre><p>
+							</p><p>
+								<a class="link" href="ch07.html#info_uniq">Пример.</a>
+							</p></dd><dt><span class="term"><a name="info_pp"></a><span class="command"><strong>P</strong></span></span></dt><dd><p>
+								Печать буфера сначала, и до первого символа \n.
+							</p><p>
+								<a class="link" href="ch07.html#info_uniq">Пример.</a>
+							</p></dd><dt><span class="term"><a name="info_h"></a><span class="command"><strong>h</strong></span></span></dt><dd><p>
+								Запись буфера в буфер2 (hold space).
+							</p></dd><dt><span class="term"><a name="info_hh"></a><span class="command"><strong>H</strong></span></span></dt><dd><p>
+								Добавление буфера к буферу2. Например:
+								</p><pre class="programlisting">буфер: АБВ
+буфер2: ГДЕ
+после команды H:
+буфер: АБВ
+буфер2: ГДЕ\nАБВ</pre><p>
+							</p></dd><dt><span class="term"><a name="info_g"></a><span class="command"><strong>g</strong></span></span></dt><dd><p>
+								Замена содержимого буфера, на содержимое буфера2.
+							</p></dd><dt><span class="term"><a name="info_gg"></a><span class="command"><strong>G</strong></span></span></dt><dd><p>
+								Добавляет к буферу содержимое буфера2. (вроде H, только меняется буфер).
+							</p></dd><dt><span class="term"><a name="info_x"></a><span class="command"><strong>x</strong></span></span></dt><dd>
+							Обмен содержимым буфера и буфера2
+							<div class="note" title="Замечание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Замечание</h3>
+								Ещё одно примечание: для работы с буфером2 (областью удержания) есть довольно много команд, если вам нужно просто копирование - предпочтительнее использовать <span class="command"><strong>x</strong></span>, она в некоторых случаях должна работать быстрее (а фиг там! В текущей версии sed(4.2) это не так, см <a class="link" href="ch02s03.html#opt_x">здесь</a>), иначе используйте <span class="command"><strong>g</strong></span> и <span class="command"><strong>h</strong></span>.  Команды <span class="command"><strong>G</strong></span> и <span class="command"><strong>H</strong></span> отличаются результатом: например если в буфере будет "АБВ", а в буфере2 будет "ГДЕ", и мы выполним <span class="command"><strong>G</strong></span>, то результат в буфере будет "АБВ\nГДЕ", а вот если мы выполним команду <span class="command"><strong>H</strong></span>, то не только результат поместится в область удержания, но и поменяется, получится "ГДЕ\nАБВ".
+							</div></dd></dl></div><p>
+			</p></div><div class="section" title="Команды для sed гуру(:,b,t)."><div class="titlepage"><div><div><h4 class="title"><a name="id2537099"></a>Команды для <span class="command"><strong>sed</strong></span> гуру(:,b,t).</h4></div></div></div><p>
+				Во многих случаях, используя следующие команды, вы можете избежать кодинга на других языках (вроде <span class="command"><strong>perl</strong></span> &amp; <span class="command"><strong>awk</strong></span>), и решить задачи средствами самой <span class="command"><strong>sed</strong></span>.
+				</p><div class="note" title="Замечание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Замечание</h3>
+					ага. Чтоб мну не обвиняли в подтасовке фактов процитирую оригинал:
+					<div class="blockquote"><blockquote class="blockquote">
+						In most cases, use of these commands indicates that you are probably
+						better off programming in something like `awk' or Perl.  But
+						occasionally one is committed to sticking with `sed', and these
+						commands can enable one to write quite convoluted scripts.
+					</blockquote></div></div><p>
+			</p><p>
+				</p><div class="variablelist"><dl><dt><span class="term"><span class="command"><strong>:</strong></span> <span class="emphasis"><em>LABEL</em></span></span></dt><dd>
+							Безадресная команда. Она задаёт метку, для перехода командами <span class="command"><strong>t</strong></span>, <span class="command"><strong>T</strong></span>, и <span class="command"><strong>b</strong></span>.
+						</dd><dt><span class="term"><a name="info_bt"></a><span class="command"><strong>b</strong></span> [LABEL]</span></dt><dd>
+							Безусловный переход на метку <span class="emphasis"><em>LABEL</em></span>. Если <span class="emphasis"><em>LABEL</em></span> не применяется, то завершает этот цикл, и начинает следующий.
+						</dd><dt><span class="term"><span class="command"><strong>t</strong></span> [<span class="emphasis"><em>LABEL</em></span>]</span></dt><dd>
+							Переход по метке <span class="emphasis"><em>LABEL</em></span>. 
+							В том случае, если последняя команда s успешно завершилась (произвела замену). При этом, если <span class="emphasis"><em>LABEL</em></span> опущена, команда прерывает цикл, и начинает следующий. Если прошлая команда <span class="command"><strong>s</strong></span> не произвела замены, команда ничего не делает.
+							<div class="tip" title="Подсказка" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Подсказка</h3>
+								условный переход в sed вовсе не обязательно делать с помощью `t'! Вы можете с лёгкостью использовать команду `b' с адресом.  Например переход на lable в команде
+								<pre class="programlisting">/X/ b lable</pre>
+								осуществляется тогда, и только тогда, когда в буфере есть хотя-бы одна буква X. Многоуровневые, вложенные и обратные (в т.ч. циклы) переходы тоже работают.
+							</div><div class="caution" title="Предостережение" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Предостережение</h3>
+								Команду <span class="command"><strong>t</strong></span> так-же частенько глючит, если есть 2 команды <span class="command"><strong>s</strong></span>, причём первая выполняется всегда, а вторая - иногда, и после второй стоит команда <span class="command"><strong>t</strong></span>, то переход будет выполнен в любом случае.  Думаю, что это какой-то древний и очень старый баг.  Для исправления ситуации, поставьте после первой <span class="command"><strong>s</strong></span> ещё одну команду <span class="command"><strong>t</strong></span> передающую управление на вторую <span class="command"><strong>s</strong></span>. Проблема в том, что если этот баг исправить, то множество скриптов перестанут правильно работать, а так-как эти команды юзают только гуру вроде нас, то разработчикам можно и не фиксить данный баг - наши скрипты и дальше будут работать правильно, я вас предупредил, и вы теперь в курсе.  Что до ламеров, которые не читают ни доки, ни чужой код - ССЗБ.
+								<div class="note" title="Замечание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Замечание</h3>
+									Поковыряв исходники, я выяснил, что команда <span class="command"><strong>s</strong></span> только <span class="emphasis"><em>устанавливает</em></span> флаг перехода (и то не всегда, а только тогда, когда произошла замена), но команда <span class="command"><strong>s</strong></span> никогда не сбрасывает флаг перехода. Он сбрасывается только командами <span class="command"><strong>t</strong></span> и <span class="command"><strong>T</strong></span>. Кроме того, флаг перехода сбрасывается во время загрузки строки в буфер в начале цикла работы sed. Если вы загружаете строки командами <span class="command"><strong>n</strong></span> и/или <span class="command"><strong>N</strong></span>, то флаг перехода не сбрасывается. Потому и приходится применять такой код:
+									<pre class="programlisting"># здесь какие-то sed команды, в том числе и команды замены
+# которые иногда заменяют, а иногда - нет.
+t label # переход к метке label, нет разницы, выполнится он или нет
+:label # потому-что метка label стоит сразу после команды перехода.
+s/ABC/&amp;/
+t found # преход выполнится только если будет найдено 'ABC'</pre></div><div class="note" title="Замечание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Замечание</h3>
+									Что-же значит <span class="quote">&#171;<span class="quote">ССЗБ</span>&#187;</span>? <span class="emphasis"><em>Сам Себе Злобный Буратино</em></span></div></div></dd></dl></div><p>
+			</p></div><div class="section" title="Команды специфичные для GNU `sed'(e,L,Q,R,T,v,W)"><div class="titlepage"><div><div><h4 class="title"><a name="id2537420"></a>Команды специфичные для GNU `sed'(e,L,Q,R,T,v,W)</h4></div></div></div><p>
+				Эти команды специфичны для GNU версии sed, вы можете использовать их в том, и только в том случае, если вы уверены, что ваши скрипты не понадобится запускать на других версиях sed.
+				</p><div class="note" title="Замечание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Замечание</h3>
+					(drBatty): Наверное имеется ввиду версия sed от NecroSoft, которая не поддерживает половину команд, и стОит всего $49.50 :-)
+				</div><p>
+			</p><p>
+				</p><div class="variablelist"><dl><dt><span class="term"><a name="info_e"></a><span class="command"><strong>e</strong></span> [<span class="emphasis"><em>COMMAND</em></span>]</span></dt><dd>
+							Эта команда вызывает по конвейеру (pipe) оболочку <span class="command"><strong>sh</strong></span>, которая выполняет команду <span class="emphasis"><em>COMMAND</em></span>. Если <span class="emphasis"><em>COMMAND</em></span> отсутствует, выполняется команды из входного потока. (см. так-же команду <span class="command"><strong>s</strong></span>, модификатор <code class="option">e</code>).
+						</dd><dt><span class="term"><a name="info_ll"></a><span class="command"><strong>L</strong></span> <span class="emphasis"><em>N</em></span></span></dt><dd>
+							Это расширение разбивает длинную строку на короткие. Строка разделяется по пробельным символам. Насколько строка "длинная" определяется параметром N (либо ключом -l, если N отсутствует). Работает примерно как команда fmt. См. так-же описание команды l.
+						</dd><dt><span class="term"><a name="info_qq"></a><span class="command"><strong>Q</strong></span> [<span class="emphasis"><em>EXIT-CODE</em></span>]</span></dt><dd>
+							Эта команда может иметь только один адрес. Работает так-же как <span class="command"><strong>q</strong></span>, но не выводит содержимое буфера в конце цикла. В оригинале написано, что эта команда представляет собой альтернативный путь, что-бы не использовать ключ <code class="option">-n</code> в тривиальных функциях.
+						</dd><dt><span class="term"><a name="info_rr"></a><span class="command"><strong>R</strong></span> <span class="emphasis"><em>FILENAME</em></span></span></dt><dd>
+							Так-же как <span class="command"><strong>r</strong></span>, но читается только одна строка из файла <span class="emphasis"><em>FILENAME</em></span>. Например:
+							<pre class="screen">$ sed 'R file1' file2</pre>
+							выведет сначала первую строку файла2, потом первую строку файла1, затем вторую файла2 и т.д. Т.о. эта команда выведет оба файла, второй в нечётных, а первый в чётных строках результата.
+						</dd><dt><span class="term"><a name="info_tt"></a><span class="command"><strong>T</strong></span> [<span class="emphasis"><em>LABEL</em></span>]</span></dt><dd>
+							так-же как <span class="command"><strong>t</strong></span>, но переход выполняется в случае неудачной замены команды <span class="command"><strong>s</strong></span>.
+						</dd><dt><span class="term"><a name="info_v"></a><span class="command"><strong>v</strong></span> <span class="emphasis"><em>VERSION</em></span></span></dt><dd>
+							Эта команда ничего не делает, если версия <span class="command"><strong>sed</strong></span> моложе или такая-же как <span class="emphasis"><em>VERSION</em></span>. В противном случае скрипт прерывается с ошибкой.
+							<pre class="screen">$ sed -version
+GNU sed version 4.0.9
+Copyright (C) 2003 Free Software Foundation, Inc.
+Эта программа - свободное программное обеспечение; условия её копирования
+смотрите в исходных текстах. Не предоставляется НИКАКИХ гарантий; даже
+подразумеваемых гарантий ПОЛЕЗНОСТИ или ПРИГОДНОСТИ ДЛЯ КОНКРЕТНОЙ ЦЕЛИ,
+в той мере, в которой это может быть допущено законодательством.
+$ sed 'v 4.0'
+$ sed 'v 4.1'
+sed: -e выражение #1, символ 5: expected newer version of sed</pre>
+							Вот более современная версия:<pre class="screen">$ sed -version
+GNU sed версия 4.2
+Copyright (C) 2003 Free Software Foundation, Inc.
+Это свободное программное обеспечение; условия его копирования смотрите в
+исходных текстах. Не предоставляется НИКАКОЙ гарантии; даже гарантии
+ПРИГОДНОСТИ ДЛЯ ПРОДАЖИ или ПРИМЕНИМОСТИ ДЛЯ КОНКРЕТНОЙ ЦЕЛИ, в той мере,
+в которой это может быть допущено законодательством.
+
+GNU sed home page: &lt;http://www.gnu.org/software/sed/&gt;.
+General help using GNU software: &lt;http://www.gnu.org/gethelp/&gt;.
+Отчеты об ошибках отправляйте по адресу: &lt;bug-gnu-utils@gnu.org&gt;.
+Убедитесь, что включили где-либо в поле ``Тема:'' слово ``sed''.
+$ sed 'v 4.2'
+^C
+$ sed 'v 4.3'
+sed: -e выражение #1, символ 5: ожидалась более новая версия sed</pre><div class="tip" title="Подсказка" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Подсказка</h3>
+								Эту команду можно использовать в том случае, если мы не уверены в версии sed у пользователя. К примеру, если мы решили применить команду <span class="command"><strong>z</strong></span>. Если версия <span class="command"><strong>sed</strong></span> слишком старая, то юзер получит сообщение об ошибке, в котором сказано, что ему следует использовать более новую версию sed.
+							</div></dd><dt><span class="term"><a name="info_ww"></a><span class="command"><strong>W</strong></span> <span class="emphasis"><em>FILENAME</em></span></span></dt><dd>
+							Так-же как <span class="command"><strong>w</strong></span>, но пишется не всё содержимое буфера, а только до первого <span class="quote">&#171;<span class="quote">\n</span>&#187;</span>. Кроме того, после записи файл не закрывается, и в следующих циклах в него можно дописать подстроки из буфера. Например:
+							<pre class="screen">sed 'W file2' file1</pre>
+							Скопирует построчно файл1 в файл2.
+							<div class="tip" title="Подсказка" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Подсказка</h3>
+								Конечно file1 можно как-нибудь отредактировать этой командой в процессе записи. Разница между командами <span class="command"><strong>w</strong></span> и <span class="command"><strong>W</strong></span> следующая: первая выводит буфер в файл, и закрывает последний, а вторая не закрывает - файл закрывается только после обработки всего входного потока.
+							</div></dd></dl></div><p>
+			</p></div><div class="section" title="Команда z"><div class="titlepage"><div><div><h4 class="title"><a name="id2537809"></a>Команда z</h4></div></div></div><a name="info_z"></a><div class="note" title="Замечание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Замечание</h3><p>
+					(drBatty): В новейших версиях GNU sed появилась новая команда z, она очищает буфер. Однако, пока ещё в большинстве систем эта версия не установлена, и очищать приходится командой <span class="command"><strong>s/.*//</strong></span>, что во первых не работает если в буфере есть <a class="link" href="ch02s04.html#bugs_utf">НЕСИМВОЛЫ,</a> и во вторых теряется флаг для команд перехода.
+				</p><p>
+					Подробнее про эту команду см. <a class="link" href="ch02s04.html#bugs_utf">здесь</a>. И <a class="link" href="ch02s06.html#whatsnew">здесь</a>.
+				</p></div></div><div class="blockquote"><blockquote class="blockquote"><p>
+		Вы можете обсудить этот документ на <a class="ulink" href="http://emulek.tk/forum/viewtopic.php?f=19&amp;t=5026" target="_top">форуме</a>. Текст предоставляется по лицензии <a class="ulink" href="http://www.gnu.org/licenses/fdl.html" target="_top">GNU Free Documentation License</a> (<a class="ulink" href="http://forum.lorcode.org/viewtopic.php?f=15&amp;t=30" target="_top">Перевод лицензии GFDL</a>).
+	</p><p>
+		Вы можете пожертвовать небольшую сумму яндекс-денег на счёт <span class="command"><strong>41001666004238</strong></span> для оплаты хостинга, интернета, и прочего. Это конечно добровольно, однако это намного улучшит данный документ (у меня будет больше времени для его улучшения). На самом деле, проект часто находится на грани закрытия, ибо никаких денег никогда не приносил, и приносить не будет. Вы можете мне помочь. Спасибо.
+	</p></blockquote></div></div><div class="navfooter"><hr><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch06s02.html">Пред.</a> </td><td width="20%" align="center"><a accesskey="u" href="ch06.html">Уровень выше</a></td><td width="40%" align="right"> <a accesskey="n" href="ch06s04.html">След.</a></td></tr><tr><td width="40%" align="left" valign="top">Программирование в sed. </td><td width="20%" align="center"><a accesskey="h" href="index.html">Начало</a></td><td width="40%" align="right" valign="top"> GNU Расширения регулярных выражений.</td></tr></table></div></body></html>

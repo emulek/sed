@@ -1,0 +1,40 @@
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"><title>Регулярные выражения.</title><link rel="stylesheet" href="chs/default.css" type="text/css"><meta name="generator" content="DocBook XSL Stylesheets V1.75.1"><link rel="home" href="index.html" title="Краткий учебник по sed."><link rel="up" href="ch01.html" title="Глава 1. Краткий учебник про sed."><link rel="prev" href="ch01s02.html" title="Использование sed."><link rel="next" href="ch02.html" title="Глава 2."></head><body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF"><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">Регулярные выражения.</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="ch01s02.html">Пред.</a> </td><th width="60%" align="center">Глава 1. Краткий учебник про sed.</th><td width="20%" align="right"> <a accesskey="n" href="ch02.html">След.</a></td></tr></table><hr></div><div class="section" title="Регулярные выражения."><div class="titlepage"><div><div><h3 class="title"><a name="id2510576"></a>Регулярные выражения.</h3></div></div></div><div class="section" title="Что такое регулярные выражения?"><div class="titlepage"><div><div><h4 class="title"><a name="id2510581"></a>Что такое регулярные выражения?</h4></div></div></div><p>
+				На самом деле, эта глава лишняя. Про регулярные выражения и так много написано... Впрочем, некоторые вещи остались нераскрытыми.
+			</p><p>
+				Регулярное выражение это обычная текстовая строка(pattern), которая используется для поиска в другой строке(buffer). Например такое регулярное выражение (далее RE): /Linux/. Если произвести поиск RE /Linux/ в строке "This is Linux!", то данное выражение будет найдено. Имеется два результата поиска:
+				</p><div class="orderedlist"><ol class="orderedlist" type="1"><li class="listitem">Позиция начала совпадения</li><li class="listitem">Позиция конца совпадения</li></ol></div><p>
+				</p><div class="figure"><a name="id2510622"></a><p class="title"><b>Рисунок 1.2. Позиции совпадения RE.</b></p><div class="figure-contents"><div><img src="img/p4.png" alt="Позиции совпадения RE."></div></div></div><p><br class="figure-break">
+				</p><div class="important" title="Важно" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Важно</h3>
+					Следует учесть, что <span class="emphasis"><em>позиция</em></span> это место <span class="emphasis"><em>между</em></span> символами.
+				</div><p>
+			</p></div><div class="section" title="Команда поиска и замены s."><div class="titlepage"><div><div><h4 class="title"><a name="id2510648"></a>Команда поиска и замены <span class="command"><strong>s</strong></span>.</h4></div></div></div><p>
+				Основной командой в sed является команда поиска и замены <span class="command"><strong>s</strong></span>. Это не удивительно: что ещё можно сделать с текстом? В принципе, все остальные команды sed являются вспомогательными инструментами, именно эта команда чаще всего используется, и имеет самое большое количество параметров и модификаторов.
+			</p><p>
+				Формат команды <span class="command"><strong>s</strong></span> довольно прост:
+				</p><pre class="programlisting">s/РЕГУЛЯРНОЕ_ВЫРАЖЕНИЕ_ДЛЯ_ПОИСКА/ВЫРАЖЕНИЕ_ДЛЯ_ЗАМЕНЫ/МОДИФИКАТОРЫ</pre><p>
+			</p><p>
+				Попробуем команду в действии:
+			</p><p>
+				<span class="command"><strong>sed 's/i/Z/' test.c</strong></span>
+				</p><pre class="screen">
+#Znclude &lt;stdio.h&gt;
+
+/* comment */
+
+Znt main()
+{
+prZntf("тестовый файл\n");
+return 0;
+}
+				</pre><p>
+				Видно, что все первые буквы i меняются на Z.
+				</p><div class="note" title="Замечание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Замечание</h3>
+					На первый взгляд непонятно, почему меняются только <span class="emphasis"><em>первые</em></span> буквы. Этому есть простое объяснение, оно <a class="link" href="ch02.html#first_g">немного ниже</a>.
+				</div><p>
+			</p><p>
+				Заменять конечно можно не только буквы, но и целые слова. Имеются и подстановочные символы(вроде wildcard's командной строки). О всём этом в следующей главе.
+			</p></div><div class="blockquote"><blockquote class="blockquote"><p>
+		Вы можете обсудить этот документ на <a class="ulink" href="http://emulek.tk/forum/viewtopic.php?f=19&amp;t=5026" target="_top">форуме</a>. Текст предоставляется по лицензии <a class="ulink" href="http://www.gnu.org/licenses/fdl.html" target="_top">GNU Free Documentation License</a> (<a class="ulink" href="http://forum.lorcode.org/viewtopic.php?f=15&amp;t=30" target="_top">Перевод лицензии GFDL</a>).
+	</p><p>
+		Вы можете пожертвовать небольшую сумму яндекс-денег на счёт <span class="command"><strong>41001666004238</strong></span> для оплаты хостинга, интернета, и прочего. Это конечно добровольно, однако это намного улучшит данный документ (у меня будет больше времени для его улучшения). На самом деле, проект часто находится на грани закрытия, ибо никаких денег никогда не приносил, и приносить не будет. Вы можете мне помочь. Спасибо.
+	</p></blockquote></div></div><div class="navfooter"><hr><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch01s02.html">Пред.</a> </td><td width="20%" align="center"><a accesskey="u" href="ch01.html">Уровень выше</a></td><td width="40%" align="right"> <a accesskey="n" href="ch02.html">След.</a></td></tr><tr><td width="40%" align="left" valign="top">Использование sed. </td><td width="20%" align="center"><a accesskey="h" href="index.html">Начало</a></td><td width="40%" align="right" valign="top"> Глава 2. </td></tr></table></div></body></html>

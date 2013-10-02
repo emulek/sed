@@ -1,0 +1,134 @@
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"><title>Метасимволы и квантификаторы.</title><link rel="stylesheet" href="chs/default.css" type="text/css"><meta name="generator" content="DocBook XSL Stylesheets V1.75.1"><link rel="home" href="index.html" title="Краткий учебник по sed."><link rel="up" href="ch05.html" title="Глава 5. Справочные материалы."><link rel="prev" href="ch05.html" title="Глава 5. Справочные материалы."><link rel="next" href="ch05s03.html" title="AABS"></head><body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF"><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">Метасимволы и квантификаторы.</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="ch05.html">Пред.</a> </td><th width="60%" align="center">Глава 5. Справочные материалы.</th><td width="20%" align="right"> <a accesskey="n" href="ch05s03.html">След.</a></td></tr></table><hr></div><div class="section" title="Метасимволы и квантификаторы."><div class="titlepage"><div><div><h3 class="title"><a name="id2528940"></a>Метасимволы и квантификаторы.</h3></div></div></div>
+		Метасимволом называется особая комбинация символов, которые в реальной строке могут совпадать с разными символами. Кроме того, некоторые метасимволы совпадают с границами между символами (например с началом строки).
+		<div class="section" title="&#171;.&#187; {точка} (любой символ)."><div class="titlepage"><div><div><h4 class="title"><a name="id2528955"></a><span class="quote">&#171;<span class="quote">.</span>&#187;</span> {точка} (любой символ).</h4></div></div></div>
+			Точка означает любой символ. 
+			Следует учесть, что символ всё-таки должен присутствовать, например RE /x.z/ будет найдено в строке <span class="quote">&#171;<span class="quote">xyz</span>&#187;</span>, <span class="quote">&#171;<span class="quote">x-z</span>&#187;</span>, <span class="quote">&#171;<span class="quote">abcxRzdef</span>&#187;</span>, но не в строке <span class="quote">&#171;<span class="quote">_xz_</span>&#187;</span>.
+		</div><div class="section" title="&#171;[abc]&#187; (символьный класс)."><div class="titlepage"><div><div><h4 class="title"><a name="id2528987"></a> <span class="quote">&#171;<span class="quote">[abc]</span>&#187;</span> (символьный класс).</h4></div></div></div>
+			на этом месте может быть только <span class="quote">&#171;<span class="quote">a</span>&#187;</span>, <span class="quote">&#171;<span class="quote">b</span>&#187;</span>, или <span class="quote">&#171;<span class="quote">c</span>&#187;</span>.
+		</div><div class="section" title="&#171;[0-9]&#187; (символьный диапазон)."><div class="titlepage"><div><div><h4 class="title"><a name="id2529010"></a> <span class="quote">&#171;<span class="quote">[0-9]</span>&#187;</span>	(символьный диапазон).</h4></div></div></div><p>
+				Под диапазон попадают все символы диапазона, здесь 0,1,2,3,4,5,6,7,8,9
+			</p><p><a name="utf-8"></a>
+				Следует учитывать, что почти все спец-символы теряют своё специальное значение внутри символьного класса. Следующие символы имеют специальное значение:
+				</p><div class="variablelist"><dl><dt><span class="term">]</span></dt><dd>
+							Завершение символьного класса.
+						</dd><dt><span class="term">-</span></dt><dd>
+							Диапазон значений. Например [A-Z] совпадает с любой большой латинской буквой. Конечно этот класс совпадает и с малыми латинскими буквами, если вы используете регистронезависимые регулярные выражения (s/RE//i или /RE/I).
+							<div class="caution" title="Предостережение" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Предостережение</h3>
+								Следует учитывать, что диапазоны имеют смысл ТОЛЬКО для символов с кодами меньше 128и. <span class="emphasis"><em>Для символов в кодировке UTF-8 диапазоны вообще не имеют никакого смысла.</em></span> В случае использования однобайтовых кодировок диапазоны имеют смысл, однако следует учитывать, что <span class="emphasis"><em>русские буквы вовсе не обязаны идти по порядку</em></span>. Например /[а-я]/ не совпадает ни с какой русской буквой в кодировке KOI8-R. В кодировке cp1251 русские буквы совпадают с выражением /[а-яё]/, там все буквы идут вместе и по порядку, кроме буквы 'ё'. Конечно для обработки текста в кодировке cp1251 необходимо во первых писать sed-скрипт в этой-же кодировке, а во вторых настроить sed на нужную кодировку. (<a class="link" href="ch02s02.html#utf8">см. так-же</a>)
+							</div>
+							См. так-же <a class="link" href="ch06s02.html#sym_class">info sed</a>.
+							<div class="tip" title="Подсказка" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Подсказка</h3>
+								Для включения в класс символа '-' его нужно расположить так, что-бы использование его как диапазона не имело смысла. Например [-0-9] совпадает с любой цифрой и минусом. Также это касается символа ']'.
+							</div></dd><dt><span class="term">\n, \t</span></dt><dd>
+							Эти символы задают символ новой строки и табуляцию. При этом табуляция вообще-то непереносима. Лучше вместо табуляции задавать этот символ прямо.
+							<div class="note" title="Замечание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Замечание</h3>
+								Я так не делаю по той причине, что в примерах это плохо видно. Но в других скриптах это часто используется. Но символ перевода строки нельзя включать <span class="emphasis"><em>как есть</em></span> внутрь символьного класса. Однако, его можно включить внутрь самого регулярного выражения (что так-же приводит к непонятности).
+							</div></dd></dl></div><p>
+			</p><p>
+				Многие хакеры используют символьные классы для записи спецсимволов, т.к. спецсимволы теряют своё значение внутри класса. Например данная команда удаляет из строки точки:
+				</p><pre class="programlisting">s/[.]//g</pre><p>
+				Однако я так не делаю - ИМХО это слишком <span class="emphasis"><em>непонятно</em></span>. Регулярные выражения и язык sed-скриптов и так абсолютно не читаемый, потому для собственного удобства я экранирую спецсимволы при необходимости, к примеру так:
+				</p><pre class="programlisting">s~http://drbatty\.ru~http://emulek.tk~</pre><p>
+				Здесь я заменил один адрес в сети (<a class="ulink" href="http://emulek.tk" target="_top">http://emulek.tk</a>) на другой.
+			</p></div><div class="section" title="[^xyz] (класс исключения)."><div class="titlepage"><div><div><h4 class="title"><a name="id2529238"></a>[^xyz]	(класс исключения).</h4></div></div></div>
+			вместо этого метасимвола будет найден любой символ кроме x или y или z
+			<div class="note" title="Замечание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Замечание</h3>
+				Символ '^' является специальным только если он записан в самом начале класса. Например RE /[^^]/ совпадает с любым символом кроме '^'.
+			</div></div><div class="section" title="\s (Пробельные символы)."><div class="titlepage"><div><div><h4 class="title"><a name="id2529261"></a>\s	(Пробельные символы).</h4></div></div></div>
+			Здесь может быть пробел или табуляция, в много строчном режиме этот метасимвол так-же соответствует переводу строки. Кроме того, этот символ совпадает с символом <span class="emphasis"><em>возврат каретки</em></span> ('\r').
+		</div><div class="section" title="\S (это любой не пробельный символ)."><div class="titlepage"><div><div><h4 class="title"><a name="id2529282"></a>\S (это любой не пробельный символ).</h4></div></div></div></div><div class="section" title="\w (словообразующий символ)."><div class="titlepage"><div><div><h4 class="title"><a name="id2529290"></a>\w	(словообразующий символ).</h4></div></div></div>
+			Эквивалентно [a-zA-Z0-9_]. Задаёт символы внутри слова
+			Кроме того, в русской локали и в кодировке UTF-8 с \w совпадают так-же русские буквы. Конечно, при правильно настроенной локализации этот символ работает и в других кодировках. <a class="link" href="ch04s04.html#t06_1">Пример.</a></div><div class="section" title="\W (это не словообразующий символ)."><div class="titlepage"><div><div><h4 class="title"><a name="id2529313"></a>\W (это не словообразующий символ).</h4></div></div></div></div><div class="section" title="\n (перевод строки)."><div class="titlepage"><div><div><h4 class="title"><a name="id2529320"></a>\n	(перевод строки).</h4></div></div></div>
+			в обычном режиме работы sed, этот символ никогда не встречается в строке(иначе это не одна строка, а 2)
+		</div><div class="section" title="\oXXX (Восьмеричное представление символа)."><div class="titlepage"><div><div><h4 class="title"><a name="id2529333"></a>\oXXX (Восьмеричное представление символа).</h4></div></div></div></div><div class="section" title="() (скобки) и обратные ссылки (\1, \2, \3 и т.д.)"><div class="titlepage"><div><div><h4 class="title"><a name="id2529341"></a>() (скобки) и обратные ссылки (\1, \2, \3  и т.д.)</h4></div></div></div><p>
+				Скобки в RE применяются для выделения <span class="emphasis"><em>подвыражений</em></span>. Эти подвыражения применяются в следующих случаях:
+				</p><div class="orderedlist"><ol class="orderedlist" type="1"><li class="listitem">
+						Если требуется повторить какое-либо подвыражение несколько раз, используя <span class="emphasis"><em>квантификаторы</em></span> (см. ниже).
+					</li><li class="listitem">
+						Также возможна замена некоторого подвыражения, к примеру данная команда сотрёт из строки всё, кроме первого числа:
+						<pre class="programlisting">s/[^0-9]*([0-9]+).*/\1/</pre>
+						Тут sed просматривает строку, пропуская все не цифры до первой цифры. Началом найденного выражения считается позиция перед первой цифрой. Концом совпадения считается позиция после последней цифры в первом числе. Вся строка <span class="emphasis"><em>заменяется</em></span> на найденное подвыражение - я использовал ссылку на него - '\1'. К примеру поиск подвыражения используется при <a class="link" href="ch04s07.html#t08">выравнивании строк</a>, там использована команда
+						<pre class="programlisting">s/^(.{,40})\s/\1\n/</pre>
+						которая отделяет символом '\n' несколько символов (не более 40) после которых идёт пробельный символ (\s).
+					</li><li class="listitem">
+						Обратные ссылки на подвыражения можно использовать не только в <span class="emphasis"><em>ВЫРАЖЕНИИ_ДЛЯ_ЗАМЕНЫ</em></span> команды <span class="command"><strong>s</strong></span>, но и в <span class="emphasis"><em>РЕГУЛЯРНОМ_ВЫРАЖЕНИИ_ДЛЯ_ПОИСКА</em></span> той-же команды. Это позволяет искать и находить вообще непонятно что. Например эта команда меняет местами две строки в буфере:
+						<pre class="programlisting">s/(.*)\n(.*)/\2\1/</pre>
+						Мы не знаем, что находится в этих строках, нам известно лишь то, что они разделены символом '\n'. Эта команда взята из этого <a class="link" href="ch04s07.html#ex_right">примера</a>.
+					</li><li class="listitem">
+						Кроме того, скобки применяются для отделения альтернатив (см. ниже).
+					</li></ol></div><p>
+			</p><p>
+				Для ссылок на подвыражения используются <span class="emphasis"><em>обратные ссылки</em></span> вида \<span class="emphasis"><em>N</em></span>, где <span class="emphasis"><em>N</em></span> представляет собой одну цифру из диапазона 1...9.
+				</p><div class="note" title="Замечание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Замечание</h3>
+					Ссылка '\0' так-же допустима в GNU sed, она заменяется на всё найденное выражение, в точности так-же как и '&amp;'. Однако в стандарте об этом не сказано, потому такую запись лучше не применять.
+				</div><p>
+			</p><p>
+				Обратные ссылки нумеруются слева-направо, при этом, если обратная ссылка используется для подвыражения с квантификатором, то она подменяется последним найденным совпадением.
+				</p><pre class="programlisting">echo "ABCDEF---" | sed -r 's/(\w)+/\1/'
+F---</pre><p>
+				Тут мы ищем буквы, которые повторяются как минимум 1 раз. Такое выражение захватывает <span class="quote">&#171;<span class="quote">ABCDEF</span>&#187;</span>, и меняется на первое подвыражение. На самом деле, это первое подвыражение (\1) последовательно принимает значения A, B, C, D, E, и F, но заменяется найденная строка именно на последнее найденное совпадение (<span class="quote">&#171;<span class="quote">F</span>&#187;</span> в данном случае).
+			</p></div><div class="section" title="&#171;|&#187; альтернатива"><div class="titlepage"><div><div><h4 class="title"><a name="id2529552"></a> <span class="quote">&#171;<span class="quote">|</span>&#187;</span> альтернатива</h4></div></div></div><p>
+				Часто нужно искать сразу два шаблона, к примеру вот такое выражение ищет разные женские имена, и меняет их на <span class="quote">&#171;<span class="quote">девочка</span>&#187;</span>
+				</p><pre class="programlisting">s/света|маша|даша|лена|катя|надя|таня/девочка/gi</pre><p>
+				В большинстве практических случаев приходится заключать поиск альтернатив в скобки, т.к. нам обычно нужно искать что-то ещё, кроме альтернатив. Например:
+				</p><pre class="programlisting">s/Нин(а|ой|е)/девочк\1/</pre><p>
+				Заменит фразу <span class="quote">&#171;<span class="quote">Выпить пивка с Ниной</span>&#187;</span> на фразу <span class="quote">&#171;<span class="quote">Выпить пивка с девочкой</span>&#187;</span>. Тут окончание сохраняется, и передаётся в заменяющее выражение.
+				</p><div class="note" title="Замечание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Замечание</h3>
+					Русский язык - дьявольски сложная штука: мы с лёгкостью можем попить пивка со Светой, но при обработке этого текста нам придётся учесть, что если женское имя начинается на 'С', то нам придётся менять предлог 'со' на предлог 'c', так-как слово <span class="quote">&#171;<span class="quote">девочка</span>&#187;</span> начинается не на 'c'.
+				</div><p>
+			</p><p>
+				Если найдены обе альтернативы, то совпадением считается то, которое больше. Такое поведение связано с тем, что альтернативы ищутся параллельно, но большее совпадение затирает меньшее.
+			</p></div><div class="section" title="\ Экранирование."><div class="titlepage"><div><div><h4 class="title"><a name="id2529641"></a>\ Экранирование.</h4></div></div></div>
+			любой спецсимвол можно за экранировать, если нам нужна к примеру именно точка, а не "любой символ". Существует 2 вида написания регэкспов, обычный, и расширенный(ERE). В дальнейшем я буду использовать только расширенный способ записи, так как он короче и понятнее. Что-бы sed работала в расширенном режиме необходима <code class="option">опция -r</code>. ERE отличается от RE тем, что в ERE почти все спецсимволы не нужно экранировать слешем.
+			<div class="example"><a name="id2529666"></a><p class="title"><b>Пример 5.1. Обычное(RE):</b></p><div class="example-contents"><pre class="programlisting">/\([0-9]\{1,3\}\.\)\{3\}[0-9]\{1,3\}/</pre></div></div><br class="example-break"><div class="example"><a name="id2529676"></a><p class="title"><b>Пример 5.2. Расширенное(ERE):</b></p><div class="example-contents"><pre class="programlisting">/([0-9]{1,3}\.){3}[0-9]{1,3}/</pre></div></div><br class="example-break">
+			Большинство спец-символов в не экранированном виде имеют специальное значение, а в экранированном - обычное, однако есть и исключения (про исключения сказано отдельно для каждого спец-символа).
+		</div><div class="section" title="\xXX (шестнадцатеричное)."><div class="titlepage"><div><div><h4 class="title"><a name="id2529697"></a>\xXX (шестнадцатеричное).</h4></div></div></div>
+			любой символ в шестнадцатеричной записи. Например /\x21/ то-же что /!/
+		</div><div class="section" title="&#171;^&#187; (начало)."><div class="titlepage"><div><div><h4 class="title"><a name="id2529708"></a> <span class="quote">&#171;<span class="quote">^</span>&#187;</span> (начало).</h4></div></div></div>
+			Совпадает с началом строки - позиция перед первым символом (если он есть).
+		</div><div class="section" title="&#171;$&#187; (конец)."><div class="titlepage"><div><div><h4 class="title"><a name="id2529722"></a> <span class="quote">&#171;<span class="quote">$</span>&#187;</span> (конец).</h4></div></div></div>
+			Совпадает с концом строки, позиция после последнего символа. Если последнего символа нет (а значит - вообще нет символов, строка пуста), то позиция <span class="quote">&#171;<span class="quote">^</span>&#187;</span> совпадает с <span class="quote">&#171;<span class="quote">$</span>&#187;</span>.
+		</div><div class="section" title="&#171;\&lt;&#187; (левая граница слова)."><div class="titlepage"><div><div><h4 class="title"><a name="id2529748"></a> <span class="quote">&#171;<span class="quote">\&lt;</span>&#187;</span> (левая граница слова).</h4></div></div></div>
+			Этот метасимвол совпадает с позицией между не буквой слева и буквой справа. Кроме того, этот метасимвол совпадает с позицией между началом строки <span class="quote">&#171;<span class="quote">^</span>&#187;</span> и буквой. Этот метасимвол нужно экранировать даже в ERE, иначе он теряет специальное значение. <a class="link" href="ch04s04.html#t06_1">Пример.</a></div><div class="section" title="&#171;\&gt;&#187; (правая граница)."><div class="titlepage"><div><div><h4 class="title"><a name="id2529782"></a> <span class="quote">&#171;<span class="quote">\&gt;</span>&#187;</span> (правая граница).</h4></div></div></div>
+			Совпадает с правой границей слова. Следует учесть, что буквой считается \w, а не буквой - \W (или $), потому для русских букв всё будет работать только если правильно настроена локаль.
+		</div><div class="section" title="&#171;\b&#187; (граница слова)."><div class="titlepage"><div><div><h4 class="title"><a name="id2529803"></a> <span class="quote">&#171;<span class="quote">\b</span>&#187;</span> (граница слова).</h4></div></div></div>
+			Совпадает как с левой, так и с правой границей слова.
+			<div class="note" title="Замечание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Замечание</h3><p>
+					Такое поведение типично только для регулярных выражений в sed. В bash символ <span class="quote">&#171;<span class="quote">\b</span>&#187;</span> имеет другое значение: это <span class="quote">&#171;<span class="quote">пробел назад (backspace)</span>&#187;</span> - использование этого символа в bash приводит к тому, что предыдущий символ затирается и на его месте печатается новый. Также этот символ называется <span class="quote">&#171;<span class="quote">Забой</span>&#187;</span>.
+				</p><p>
+					Однако, что-бы использовать этот символ в bash-команде <span class="command"><strong>echo</strong></span> нужно применить <code class="option">опцию -e</code>, как и при использовании других спец-символов, например '\n'.
+				</p><p>
+					Кроме того, вы можете использовать bash-команду <span class="command"><strong>printf</strong></span>, которая так-же понимает подобные спец-символы.
+				</p><p>
+					На самом деле, и <span class="command"><strong>echo</strong></span>, и <span class="command"><strong>printf</strong></span> являются <span class="emphasis"><em>встроенными</em></span> встроенными командами bash'а, т.е. исполняются самим командным интерпретатором. Однако, в большинстве систем имеются и отдельные <span class="emphasis"><em>исполняемые файлы</em></span> /usr/bin/printf и /usr/bin/echo. Их действие не отличается от встроенных команд. За исключением разве что времени обработки - встроенные команды работают конечно быстрее.
+				</p><p>
+				В <span class="emphasis"><em>ВЫРАЖЕНИИ_ДЛЯ_ЗАМЕНЫ</em></span> sed-команды <span class="command"><strong>s</strong></span> символ <span class="quote">&#171;<span class="quote">\b</span>&#187;</span> не выполняет никаких действий, и заменяется на символ <span class="quote">&#171;<span class="quote">b</span>&#187;</span> . Я правда не в курсе, совпадает-ли такое поведение со стандартом. Однако для GNU sed версии 4.2 это так...
+				</p></div></div><div class="section" title="\` (начало буфера)."><div class="titlepage"><div><div><h4 class="title"><a name="id2529943"></a>\` (начало буфера).</h4></div></div></div>
+			Этот метасимвол совпадает с началом буфера. Обычно он срабатывает так-же как ^, за исключением случая, когда одновременно выполняются 2 условия:
+			<div class="orderedlist"><ol class="orderedlist" type="1"><li class="listitem">
+				В строке находятся несколько строк, т.е. имеются символы перевода строки \n. Они могут туда попасть после выполнения команд <span class="command"><strong>N, G, H</strong></span>, или после замены чего-либо командой <span class="command"><strong>s///</strong></span>. Но сами по себе эти символы никогда не загружаются в буфер из входного потока.
+			</li><li class="listitem">
+				Если включён многострочный режим (модификатором <code class="option">m</code> для команды <span class="command"><strong>s///</strong></span>, либо модификтором <code class="option">M</code> для адресного выражения).
+			</li></ol></div>
+			Если выполнены оба условия, то ^ совпадает с началом <span class="emphasis"><em>каждой</em></span> строки, а символ \` только с началом первой. <a class="link" href="ch04s13.html#pconf">Здесь</a> я успешно применил многострочный режим, хотя мне и не понадобился метасимвол \`, но я зато успешно использовал свойства символа ^ совпадать сразу с несколькими местами в буфере - там у меня в буфере лежит целый конфигурационный файл из множества строк.
+		</div><div class="section" title="\' (конец буфера)."><div class="titlepage"><div><div><h4 class="title"><a name="id2530031"></a>\' (конец буфера).</h4></div></div></div>
+			Работает в точности как и \`, однако совпадает с концом последней строки в многострочном режиме.
+		</div><div class="section" title="* (любое число повторений)."><div class="titlepage"><div><div><h4 class="title"><a name="id2530043"></a>* (любое число повторений).</h4></div></div></div>
+			Этот символ является <span class="emphasis"><em>квантификатором</em></span>, они ни с чем не совпадает, но задаёт <span class="emphasis"><em>число повторений</em></span> предыдущего (мета)символа или даже целого подвыражения. Звёздочка допускает любое число повторений, в том числе и отсутствие (мета)символа. Как и остальные квантификаторы, звёздочка действует только на предыдущий (мета)символ, например, выражение /AB*/ совпадает с A, AB, ABB, ABBB, ABBBB и т.д..
+		</div><div class="section" title="+ (один или больше символов)."><div class="titlepage"><div><div><h4 class="title"><a name="id2530072"></a>+ (один или больше символов).</h4></div></div></div>
+			Так-же как и звёздочка, совпадает с любым числом символов, но в отличие от неё, хотя-бы один символ должен быть. Например с шаблоном /AB+/ не совпадает одиночный символ A.
+		</div><div class="section" title="? (может есть, а может и нет)."><div class="titlepage"><div><div><h4 class="title"><a name="id2530090"></a>? (может есть, а может и нет).</h4></div></div></div>
+			Задаёт необязательный (мета)символ (или необязательное подвыражение). К примеру целое число со знаком можно записать так: /[+-]?[0-9]+/.
+		</div><div class="section" title="{I,J} (повторение от I до J раз)."><div class="titlepage"><div><div><h4 class="title"><a name="id2530105"></a>{I,J} (повторение от I до J раз).</h4></div></div></div>
+			Этот квантификатор явно указывает сколько раз повторяется предыдущий (мета) символ, например /Z{3,5}/ совпадает только со строками ZZZ, ZZZZ, и ZZZZZ, и ни с чем иным. Можно опустить либо <span class="emphasis"><em>I</em></span>, либо <span class="emphasis"><em>J</em></span>, в первом случае <span class="emphasis"><em>I</em></span> считается == 0, во втором - бесконечность.
+			<div class="note" title="Замечание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Замечание</h3>
+				Как и остальные <span class="emphasis"><em>квантификаторы</em></span> этот также <span class="emphasis"><em>жадный</em></span> - он захватывает максимально возможное число совпадений.
+			</div>
+			Кроме того, можно точно указать число совпадений. к примеру выражение /(AB){3}/ совпадает только со строкой "ABABAB". Вот ещё пример: выражение совпадающее с MD5 суммой: /[[:xdigit:]]{32}/.
+			<div class="tip" title="Подсказка" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Подсказка</h3>
+				Этот квантификатор позволяет мне не использовать awk для работы с полями, к примеру, если я пожелаю вывести список файлов в формате <span class="emphasis"><em>размер имя</em></span>, то мне будет достаточно взять пятый и восьмой столбцы:
+				<pre class="programlisting">ls -l | sed -r 's/(\S+\s+){4}(\S+\s+)(\S+\s+){2}(.*)/\2 \4/'</pre></div></div><div class="blockquote"><blockquote class="blockquote"><p>
+		Вы можете обсудить этот документ на <a class="ulink" href="http://emulek.tk/forum/viewtopic.php?f=19&amp;t=5026" target="_top">форуме</a>. Текст предоставляется по лицензии <a class="ulink" href="http://www.gnu.org/licenses/fdl.html" target="_top">GNU Free Documentation License</a> (<a class="ulink" href="http://forum.lorcode.org/viewtopic.php?f=15&amp;t=30" target="_top">Перевод лицензии GFDL</a>).
+	</p><p>
+		Вы можете пожертвовать небольшую сумму яндекс-денег на счёт <span class="command"><strong>41001666004238</strong></span> для оплаты хостинга, интернета, и прочего. Это конечно добровольно, однако это намного улучшит данный документ (у меня будет больше времени для его улучшения). На самом деле, проект часто находится на грани закрытия, ибо никаких денег никогда не приносил, и приносить не будет. Вы можете мне помочь. Спасибо.
+	</p></blockquote></div></div><div class="navfooter"><hr><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch05.html">Пред.</a> </td><td width="20%" align="center"><a accesskey="u" href="ch05.html">Уровень выше</a></td><td width="40%" align="right"> <a accesskey="n" href="ch05s03.html">След.</a></td></tr><tr><td width="40%" align="left" valign="top">Глава 5. Справочные материалы. </td><td width="20%" align="center"><a accesskey="h" href="index.html">Начало</a></td><td width="40%" align="right" valign="top"> AABS</td></tr></table></div></body></html>

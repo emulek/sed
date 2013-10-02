@@ -1,0 +1,80 @@
+body { font-family: Verdana, Tahoma, Arial, Helvetica; }
+body, td { font-size: 90%; }
+body.tabular { margin-left: 0; margin-top: 0; margin-right: 15; }
+h1, h2, h3, h4, h5
+{ font-style: italic; }
+h1 { font-size: 200%; }
+h2 { font-size: 150%; }
+h3 { font-size: 125%; text-align: center; }
+h3.author, h3.corpauthor
+{
+	text-align: left;
+	font-style: normal;
+	font-size: 100%;
+	margin-bottom: 0;
+}
+h1, h2, h3, h4, h5,
+div.navheader th, .toc, .title,
+a:link, a:active, { color: #00a5a5; }
+a:visited { color: #666666; }
+.navtoc a:link, .navtoc a:visited, .navtoc a:active
+{
+	color: #ffffff;
+}
+.content
+{
+	padding-left: 15;
+	padding-top: 10;
+	vertical-align: top;
+}
+.programlisting
+{
+	background-color: #dddddd;
+	border: thin solid #cccccc; padding: 0.25em 1em 0.25em 1em;
+}
+.note
+{
+	background-color: #ddddff;
+	border: thin solid #cccccc; padding: 0.25em 1em 0.25em 1em;
+}
+.warning
+{
+	background-color: #ff8080;
+	border: thin solid #cccccc; padding: 0.25em 1em 0.25em 1em;
+}
+.caution
+{
+	background-color: #f0f0dd;
+	border: thin solid #cccccc; padding: 0.25em 1em 0.25em 1em;
+}
+.tip
+{
+	background-color: #ddf0dd;
+	border: thin solid #cccccc; padding: 0.25em 1em 0.25em 1em;
+}
+.screen
+{
+	background-color: #ccffcc;
+	color: #000010;
+	border: thin solid #cccccc; padding: 0.25em 1em 0.25em 1em;
+}
+.important
+{
+	background-color: #fdddfd;
+	border: thin solid #cccccc; padding: 0.25em 1em 0.25em 1em;
+}
+.emphasis
+{
+	text-decoration: underline;
+	color: #500050;
+}
+.abstract { font-style: italic; }
+.abstract .title { font-style: normal; }
+.figure, .informalfigure { text-align: center; }
+div.blockquote
+{
+	border-left: 3px double;
+	font-size: 70%;
+	background-color: #ffffdd;
+}
+div.ad { padding-top: 35; padding-left: 22; }

@@ -1,0 +1,107 @@
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"><title>Создание снимков каталогов для бекапа</title><link rel="stylesheet" href="chs/default.css" type="text/css"><meta name="generator" content="DocBook XSL Stylesheets V1.75.1"><link rel="home" href="index.html" title="Краткий учебник по sed."><link rel="up" href="ch04.html" title="Глава 4. Примеры скриптов."><link rel="prev" href="ch04s14.html" title="Переименование файлов и каталогов."><link rel="next" href="ch04s16.html" title="Восстановление данных и файловая система."></head><body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF"><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">Создание снимков каталогов для бекапа</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="ch04s14.html">Пред.</a> </td><th width="60%" align="center">Глава 4. Примеры скриптов.</th><td width="20%" align="right"> <a accesskey="n" href="ch04s16.html">След.</a></td></tr></table><hr></div><div class="section" title="Создание снимков каталогов для бекапа"><div class="titlepage"><div><div><h3 class="title"><a name="id2525529"></a>Создание снимков каталогов для бекапа</h3></div></div></div><p>
+			Сделать бекап очень просто: достаточно выполнить команду:
+			</p><pre class="screen">$ find . -newer $last_backup -type f -exec cp {} $backup_dir \;</pre><p>
+			Эта команда скопирует все файлы которые изменились с момента создания прошлого бекапа ($last_backup) в каталог $backup_dir.  Конечно нужно найти последний бекап: это можно сделать командой <span class="command"><strong>ls</strong></span>, к ключом <code class="option">-t</code> прогнав её вывод сквозь фильтр <span class="command"><strong>head</strong></span> <code class="option">-n1</code>.
+			</p><div class="tip" title="Подсказка" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Подсказка</h3>
+				Что-бы новые файлы не затирали копии старых, у <span class="command"><strong>cp</strong></span> есть <code class="option">опция -V METHOD, --version-control=METHOD</code>, см. man cp.
+			</div><p>
+		</p><p>
+			Всё это прекрасно, но мне надо сохранять только разные файлы, несмотря на то, что нужно так-же сохранять информацию о тех файлах, время модификации которых позже последнего бекапа, однако их содержимое не изменилось.
+		</p><p>
+			Потому мне придётся создавать списки новых файлов (они так-же будут служить временными метками для поиска новых файлов), и кроме того нужно хранить контрольную сумму.  Её я буду хранить прямо в имени файла, через точку.
+		</p><p>
+			Т.о. мы приходим к сл. алгоритму:
+			</p><div class="orderedlist"><ol class="orderedlist" type="1"><li class="listitem">
+					Прежде всего мы получаем имя списка последнего бекапа командой
+					<pre class="programlisting">LAST_LST=`/bin/ls -t *.lst | sed 's/^/-newer /; q'`</pre><div class="note" title="Замечание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Замечание</h3>Если такого списка ещё нет, то команда завершится с ошибкой, что впрочем нас вполне устраивает</div>
+					Команда sed не только фильтрует нужный файл, но ещё и добавляет к нему ключ <code class="option">-newer</code>.
+				</li><li class="listitem">
+					Получив имя самого последнего списка мы ищем новые и изменённые файлы
+					<pre class="programlisting">find $BACKUP_DIRS $LAST_LST -type f -iname "*.*"</pre></li><li class="listitem">
+					Далее, полученный список мы отдаём sed-скрипту, который
+					<div class="orderedlist"><ol class="orderedlist" type="a"><li class="listitem">
+							Проверяет корректность имени файла
+						</li><li class="listitem">
+							Копирует файл
+						</li><li class="listitem">
+							Вычисляет контрольную сумму
+						</li><li class="listitem">
+							Проверяет, есть-ли файл с таким именем и содержимым.
+						</li><li class="listitem">
+							Если файл есть, то копия удаляется, а в список заносится имя файла перед которым стоит `~'.
+						</li><li class="listitem">
+							Если такого файла нет, то он сохраняется, и записывается в список с символом `+'.
+						</li></ol></div></li></ol></div><p>
+		</p><p>
+			Вот скрипт на bash'е
+			</p><div class="example"><a name="id2525717"></a><p class="title"><b>Пример 4.18. </b></p><div class="example-contents"><pre class="programlisting">#!/bin/bash
+
+SNAPSHOTS="/tmp/bsnapshots"
+cd "$SNAPSHOTS" || exit
+
+BACKUP_DIRS="/home/doc/docs/sed"
+EXE_DIR="/home/doc/docs"
+
+CUR_DATE=`date +"%y%m%d%H%M"`
+
+LAST_LST=`/bin/ls -t *.lst | sed 's/^/-newer /; q'`
+
+
+find $BACKUP_DIRS $LAST_LST -type f -iname "*.*" |\
+$EXE_DIR/bsnapshot.sed &gt; "$CUR_DATE.lst"
+err=$?
+if [ $err != "0" ]; then
+	echo "ERROR $err"
+	exit $err
+fi
+
+if [ -s "$CUR_DATE.lst" ]; then
+	cat $CUR_DATE.lst
+else
+	rm $CUR_DATE.lst
+fi</pre></div></div><p><br class="example-break">
+			И этот скрипт вызывает sed-скрипт:
+			</p><div class="example"><a name="id2525733"></a><p class="title"><b>Пример 4.19. </b></p><div class="example-contents"><pre class="programlisting">#!/bin/sed -rnf
+
+# файлы для бекапа должны быть с полным путём
+\|^/[^/"]+/[^"]*[^/"]$|! q 79
+
+h
+# копирование файла во временный каталог
+s/.*/cp --parents "&amp;" "."; echo $?/e
+/^0$/!  q 77
+g
+# вычисление контрольной суммы
+s|.*|cksum ".&amp;"|e
+# получение нового имени файла
+s|^([0-9]+)\s+[0-9]+\s+(.*)|\2.\1|
+# проверка
+h
+# ./home/doc/...
+s|.*|test -f "&amp;"; echo $?|e
+/^0$/ {
+	# этот файл уже есть в бекапах
+	g
+	s/.*/~&amp;/p
+	# удаление копии
+	s/^~(.*)\.[0-9]+$/rm \1/e
+	b
+}
+
+# такого файла ещё нет
+g
+s|^(.+)\.([0-9]+)$|mv "\1" "\1.\2"; echo $?|e
+/^0$/! q 78
+g
+s/^/+/p</pre></div></div><p><br class="example-break">
+		</p><p>
+			Я не сохраняю пустые каталоги, однако каталоги с файлами создаются.  Этот скрипт так-же проверяет коды завершения команд которые он вызывает.  В случае ошибок работа скрипта прерывается.  Время от времени нужно сжимать этот временный каталог.
+		</p><p>
+			</p><div class="note" title="Замечание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Замечание</h3>
+				К примеру этот учебник написан в формате docbooks, и после его сборки получается множество HTML файлов (которые вы и читаете), проблема в том, что эти файлы почти все не изменяются (не могу-же я изменить содержимое <span class="emphasis"><em>всех глав сразу!</em></span>).  Однако время изменения совпадает со временем последней сборки.  Та-же самая ситуация возникает, если мы решим забекапить большую базу данных - мало вероятно, что сразу изменятся все базы и все таблицы.
+			</div><p>
+		</p><div class="blockquote"><blockquote class="blockquote"><p>
+		Вы можете обсудить этот документ на <a class="ulink" href="http://emulek.tk/forum/viewtopic.php?f=19&amp;t=5026" target="_top">форуме</a>. Текст предоставляется по лицензии <a class="ulink" href="http://www.gnu.org/licenses/fdl.html" target="_top">GNU Free Documentation License</a> (<a class="ulink" href="http://forum.lorcode.org/viewtopic.php?f=15&amp;t=30" target="_top">Перевод лицензии GFDL</a>).
+	</p><p>
+		Вы можете пожертвовать небольшую сумму яндекс-денег на счёт <span class="command"><strong>41001666004238</strong></span> для оплаты хостинга, интернета, и прочего. Это конечно добровольно, однако это намного улучшит данный документ (у меня будет больше времени для его улучшения). На самом деле, проект часто находится на грани закрытия, ибо никаких денег никогда не приносил, и приносить не будет. Вы можете мне помочь. Спасибо.
+	</p></blockquote></div></div><div class="navfooter"><hr><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch04s14.html">Пред.</a> </td><td width="20%" align="center"><a accesskey="u" href="ch04.html">Уровень выше</a></td><td width="40%" align="right"> <a accesskey="n" href="ch04s16.html">След.</a></td></tr><tr><td width="40%" align="left" valign="top">Переименование файлов и каталогов. </td><td width="20%" align="center"><a accesskey="h" href="index.html">Начало</a></td><td width="40%" align="right" valign="top"> Восстановление данных и файловая система.</td></tr></table></div></body></html>

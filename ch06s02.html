@@ -1,0 +1,267 @@
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"><title>Программирование в sed.</title><link rel="stylesheet" href="chs/default.css" type="text/css"><meta name="generator" content="DocBook XSL Stylesheets V1.75.1"><link rel="home" href="index.html" title="Краткий учебник по sed."><link rel="up" href="ch06.html" title="Глава 6. info sed. (русский перевод)."><link rel="prev" href="ch06.html" title="Глава 6. info sed. (русский перевод)."><link rel="next" href="ch06s03.html" title="Команды sed"></head><body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF"><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">Программирование в sed.</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="ch06.html">Пред.</a> </td><th width="60%" align="center">Глава 6. info sed. (русский перевод).</th><td width="20%" align="right"> <a accesskey="n" href="ch06s03.html">След.</a></td></tr></table><hr></div><div class="section" title="Программирование в sed."><div class="titlepage"><div><div><h3 class="title"><a name="id2532922"></a>Программирование в sed.</h3></div></div></div><div class="section" title="Вступление."><div class="titlepage"><div><div><h4 class="title"><a name="id2532927"></a>Вступление.</h4></div></div></div><p>
+				<span class="command"><strong>sed</strong></span> программы содержат одну или более <span class="command"><strong>sed</strong></span> команд. Программы записываются в файл, который выполняется командой <span class="command"><strong>sed</strong></span> с ключом <code class="option">-f</code>, либо в командной строке первым параметром (без <span class="quote">&#171;<span class="quote">-</span>&#187;</span> вначале), либо после ключа <code class="option">-e</code>.
+			</p><p>
+				Некоторые sed-команды содержат адрес, либо диапазон адресов. Команды sed записываются одним символом, но могут содержать дополнительные параметры и флаги.
+			</p></div><div class="section" title="Выбор строк, которые редактирует `sed' (адресация)."><div class="titlepage"><div><div><h4 class="title"><a name="id2532980"></a><a name="info_adr"></a>Выбор строк, которые редактирует `sed' (адресация).</h4></div></div></div><p>
+				Адресация в sed имеет следующие формы:
+				</p><div class="variablelist"><dl><dt><span class="term"><span class="emphasis"><em>NUMBER</em></span></span></dt><dd>
+							Номер строки. Целое, неотрицательное число большее нуля. С этим адресом совпадает только одна строка с номером <span class="emphasis"><em>NUMBER</em></span>.
+							<div class="note" title="Замечание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Замечание</h3>
+								Если используется ключ <code class="option">-s</code> или <code class="option">-i</code>, то с этим адресом совпадают все строки с номером <span class="emphasis"><em>NUMBER</em></span> для каждого файла.
+							</div></dd><dt><span class="term"><span class="emphasis"><em>FIRST</em></span>~<span class="emphasis"><em>STEP</em></span></span></dt><dd>
+							Это GNU расширение адресации совпадает с каждой строкой начиная с <span class="emphasis"><em>FIRST</em></span>, с шагом <span class="emphasis"><em>STEP</em></span>. <span class="emphasis"><em>STEP</em></span> должен быть неотрицательным числом. Например, "1~2" совпадает со всеми нечётными строками, "2~2" со всеми чётными (можно использовать "0~2" с тем-же результатом) "3~5" со строками 3,8,13,18...3+5*n "10~0" совпадает только с десятой строкой. "10~1" совпадает со всеми строками, начиная с десятой.
+						</dd><dt><span class="term">$</span></dt><dd>
+							Этот адрес совпадает с последней строкой входного потока, или с последними строками каждого входного файла при использовании опций <code class="option">-i</code> или <code class="option">-s</code>.
+						</dd><dt><span class="term">/<span class="emphasis"><em>REGEXP</em></span>/</span></dt><dd><p>
+								Выбирает только строки, в которых встречается выражение /<span class="emphasis"><em>REGEXP</em></span>/ , если ваше выражение содержит <span class="quote">&#171;<span class="quote">/</span>&#187;</span>, вы их должны экранировать обратным слешем <span class="quote">&#171;<span class="quote">\</span>&#187;</span>.
+							</p><p>
+								Если <span class="quote">&#171;<span class="quote">POSIXLY_CORRECT</span>&#187;</span> не определена, то пустое выражение <span class="command"><strong>//</strong></span> совпадает с последним найденным выражением команды <span class="command"><strong>s///</strong></span>.
+								</p><div class="note" title="Замечание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Замечание</h3>
+									Скомпилированое регулярное выражение может изменится в процессе выполнения скрипта.
+								</div><p>
+								Если переменная <span class="quote">&#171;<span class="quote">POSIXLY_CORRECT</span>&#187;</span> установлена, то пустое регулярное выражение ни с чем не совпадает. Такое поведение определено стандартом POSIX.
+							</p></dd><dt><span class="term">\%<span class="emphasis"><em>REGEXP</em></span>%</span></dt><dd><p>
+								(Вместо % можно использовать любой другой символ)
+							</p><p>
+								Так-же как и /<span class="emphasis"><em>REGEXP</em></span>/, но вместо разделителя(слеша) используется %(либо другой символ), если в выражении присутствует разделитель, его необходимо экранировать.
+							</p></dd><dt><span class="term">/<span class="emphasis"><em>REGEXP</em></span>/ I \%<span class="emphasis"><em>REGEXP</em></span>%I</span></dt><dd>
+							Модификатор <code class="option">I</code> используется для того, что-бы выражение было нечувствительно к регистру. (это GNU расширение).
+						</dd><dt><span class="term">/<span class="emphasis"><em>REGEXP</em></span>/ M \%<span class="emphasis"><em>REGEXP</em></span>%M</span></dt><dd><p>
+								Этот модификатор так-же является GNU расширением. 
+							</p><p>
+								Он позволяет строить регулярные выражения в многострочном режиме. Обычно в буфере находится всего одна строка(особенно при использовании адресации), и этот модификатор ни на что не влияет. Его влияние заметно только в том случае, если в буфере sed находится сразу несколько строк(это может произойти после применения команд <span class="command"><strong>N</strong></span>, <span class="command"><strong>G</strong></span>, либо если в буфер была записана область удержания, к которой была применена команда <span class="command"><strong>H</strong></span>). 
+							</p><p>
+								Например: содержимое буфера:
+								</p><pre class="programlisting">abc\n def\n</pre><p>
+								(<span class="quote">&#171;<span class="quote">\n</span>&#187;</span> означает перевод строки)
+							</p><p>
+								выражение /f$/ совпадает и с модификатором <code class="option">M</code>, и без него, но выражение /c$/ совпадает только с модификатором: /c$/ <code class="option">M</code>, потому-что по умолчанию, sed считает буфер одной строкой, даже если в нём присутствуют символы новой строки.
+							</p></dd></dl></div><p>
+			</p><p>
+				Если нет адреса, <span class="command"><strong>sed</strong></span> обрабатывает все строки.
+			</p><p>
+				Если имеется один адрес, sed обрабатывает только строки, которые совпадают с этим адресом.
+			</p><p>
+				Если имеются два адреса разделённые запятой(<span class="quote">&#171;<span class="quote">,</span>&#187;</span>), sed обрабатывает диапазон адресов, с первого адреса, до второго(включительно). Если второй адрес является регулярным выражением, тогда его совпадение проверяется только начиная со следующей строки, после той, с которой совпал первый адрес. Если вы хотите проверять текст с первой строки, но так, что-бы условие окончания диапазона проверялось и в первой строке тоже, используйте GNU расширение:
+				</p><pre class="programlisting">0, /REGEXP/</pre><p>
+				такая форма адресации совпадает только с первой строкой, если эта строка совпадает с /REGEXP/ . Обычная адресация(1, /REGEXP/ ) совпадает со всеми строками текста, или до совпадения какой-либо строки с /REGEXP/ , начиная со второй.
+			</p><p>
+				Если второй адрес является числом, и оно меньше номера строки совпавшей с первым адресом (или равно ему), то выводится только эта строка.
+			</p><p>
+				GNU sed поддерживает следующие расширения адресации:
+				</p><div class="variablelist"><dl><dt><span class="term">0,<span class="emphasis"><em>ADDR2</em></span></span></dt><dd>
+							Совпадает со всеми строками, начиная с первой, и до <span class="emphasis"><em>ADDR2</em></span>. Работает так-же как 1,<span class="emphasis"><em>ADDR2</em></span>, если первая строка не совпадает с <span class="emphasis"><em>ADDR2</em></span>, Если первая строка совпадает с <span class="emphasis"><em>ADDR2</em></span>, то этот диапазон совпадает только с ней(первой строкой).
+						</dd><dt><span class="term"><span class="emphasis"><em>ADDR1</em></span>,+<span class="emphasis"><em>N</em></span></span></dt><dd>
+							Совпадает с <span class="emphasis"><em>N+1</em></span> строками подряд, начиная с <span class="emphasis"><em>ADDR1</em></span>.
+						</dd><dt><span class="term"><span class="emphasis"><em>ADDR1</em></span>,~<span class="emphasis"><em>N</em></span></span></dt><dd>
+							Совпадает со строками начиная с <span class="emphasis"><em>ADDR1</em></span>, и до строки, которая делится на <span class="emphasis"><em>N</em></span>.
+						</dd></dl></div><p>
+			</p><p>
+				Добавление символа <span class="quote">&#171;<span class="quote">!</span>&#187;</span> в конце адресного выражения приводит к его инверсии, с таким выражением совпадает всё, что не совпадает с адресом. Если с адресным выражением совпадают все строки(например его нет), то добавление ! Приводит к тому, что с таким адресом ничего не совпадает.
+			</p></div><div class="section" title="Обзор синтаксиса регулярных выражений."><div class="titlepage"><div><div><h4 class="title"><a name="id2533524"></a>Обзор синтаксиса регулярных выражений.</h4></div></div></div><p>
+				Для того, что-бы использовать sed, необходимо понимать регулярные выражения ( <span class="emphasis"><em>regexp</em></span>(<span class="emphasis"><em>RE</em></span> или для расширенных <span class="emphasis"><em>ERE</em></span>), для краткости). Регулярное выражение, это шаблон, который проверяется на совпадение с заданной строкой (другими словами, шаблон ищется в данной строке). Проверка производится слева направо. 
+			</p><p>
+				Многие символы в regexp воспринимаются "как есть": Если мы желаем найти в строке символ <span class="quote">&#171;<span class="quote">Q</span>&#187;</span>, то для поиска потребуется regexp /Q/ . Тривиальный пример: этот regexp - <span class="quote">&#171;<span class="quote">test</span>&#187;</span> совпадает с теми, и только с теми строками, в которых есть слово <span class="quote">&#171;<span class="quote">test</span>&#187;</span>.
+			</p><p>
+				Мощность регулярных выражений определяется тем, что в них могут присутствовать специальные символы, которые позволяют задавать разные критерии совпадений, а так-же повторение символов и подвыражений.
+			</p><p><a name="info_meta"></a>
+				</p><div class="variablelist"><dl><dt><span class="term">СИМВОЛ</span></dt><dd>Совпадает с одним <span class="emphasis"><em>СИМВОЛ</em></span>ом.</dd><dt><span class="term"> <span class="quote">&#171;<span class="quote"><span class="emphasis"><em>*</em></span></span>&#187;</span> </span></dt><dd><p>
+								Совпадает любым числом вхождений предыдущего символа или предыдущего регулярного подвыражения(в том числе и его отсутствия). Если вы желаете найти именно символ <span class="quote">&#171;<span class="quote">*</span>&#187;</span>, то его следует за экранировать (<span class="quote">&#171;<span class="quote">\*</span>&#187;</span>).
+							</p><p>
+								Расширение GNU: <span class="quote">&#171;<span class="quote">a<span class="emphasis"><em>**</em></span></span>&#187;</span> эквивалентно <span class="quote">&#171;<span class="quote">a*</span>&#187;</span>. Правда это не стандартно, и применять такие конструкции не следует (они могут быть восприняты как <span class="quote">&#171;<span class="quote">a*\*</span>&#187;</span>).
+							</p></dd><dt><span class="term"> <span class="quote">&#171;<span class="quote"><span class="emphasis"><em>+</em></span></span>&#187;</span> </span></dt><dd>Так-же как <span class="quote">&#171;<span class="quote"><span class="emphasis"><em>*</em></span></span>&#187;</span>, однако хотя-бы один символ должен присутствовать (GNU расширение).</dd><dt><span class="term"> <span class="quote">&#171;<span class="quote"><span class="emphasis"><em>?</em></span></span>&#187;</span> </span></dt><dd>Так-же как <span class="quote">&#171;<span class="quote">*</span>&#187;</span>, но совпадает только с 0 либо с 1 символом (GNU расширение).</dd><dt><span class="term">{<span class="emphasis"><em>I</em></span>}</span></dt><dd>Совпадает точно с <span class="emphasis"><em>I</em></span> символами, например /X\{5\}/ совпадает только с XXXXX. (<span class="emphasis"><em>I</em></span> - целое десятичное число, для переносимости должно быть в диапазоне 0...255).</dd><dt><span class="term">{<span class="emphasis"><em>I</em></span>,<span class="emphasis"><em>J</em></span>}</span></dt><dd>Диапазон числа совпадений <span class="emphasis"><em>I</em></span>...<span class="emphasis"><em>J</em></span></dd><dt><span class="term">{<span class="emphasis"><em>I</em></span>,}</span></dt><dd>Число совпадений не менее <span class="emphasis"><em>I</em></span>.</dd><dt><span class="term">(REGEXP)</span></dt><dd>
+							Группирование выражений. Применяется в следующих случаях:
+							<div class="orderedlist"><ol class="orderedlist" type="1"><li class="listitem"><p>
+										Для применения постфиксных операций. Например:
+										</p><pre class="programlisting">/(XY){3}/</pre><p>
+										совпадает с XYXYXY, но
+										</p><pre class="programlisting">/XY{3}/</pre><p>
+										совпадает только с XYYY.
+										</p><div class="note" title="Замечание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Замечание</h3>
+											Стандарт POSIX 1003.1-2001 требует такого поведения, и многие non-GNU реализации его поддерживают, однако такая конструкция в общем случае не переносима.
+										</div><p>
+									</p></li><li class="listitem">
+									Для реализации обратных ссылок(см. ниже).
+								</li></ol></div></dd><dt><span class="term"> <span class="quote">&#171;<span class="quote"><span class="emphasis"><em>.</em></span></span>&#187;</span> (точка)</span></dt><dd>
+							Совпадает с любым одиночным символом, включая символ перевода строки.
+							<div class="note" title="Замечание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Замечание</h3>
+								Однако, см.выше, Ограничения sed, пункт 1.б. (примечание drBatty)
+							</div>
+							Что такое "Любой одиночный символ"? Это лучше пояснить примером
+							<pre class="programlisting">sed 's/./Z/'</pre>
+							(описание sed-команды s см.ниже, в данном случае sed просто поменяет шаблон /./ на "Z").
+							<pre class="screen">$ echo "A" | sed 's/./Z/'
+	Z
+	# самое простое - я дал sed один символ, и она его поменяла.
+	$ echo "ABCDE" | sed 's/./Z/'
+	ZBCDE
+	# в данной строке меняется только первый символ(с помощью модификаторов s (см. ниже)
+	# это поведение можно изменить)
+	$ echo "" | sed 's/./Z/'
+	# пустая строка не изменилась, в этом случае выполнение команды s не так просто -
+	# дело в том, что я просил "найти любой символ", но она не смогла этого сделать
+	# (т.к. символов вообще нет), потому замены не было, и строка осталась без
+	# изменения.</pre></dd><dt><span class="term"> <span class="quote">&#171;<span class="quote"><span class="emphasis"><em>^</em></span></span>&#187;</span> </span></dt><dd>
+							Неплохо сказано в оригинале: <span class="quote">&#171;<span class="quote">Matches the null string at beginning of line</span>&#187;</span> Уж и не знаю, как это перевести :-( Попытаюсь объяснить своими словами: <span class="quote">&#171;<span class="quote"><span class="emphasis"><em>^</em></span></span>&#187;</span> является "псевдосимволом", т.е. одним из специальных символов, которые не совпадают ни с каким из символов в оригинальной строке, однако совпадают с определённой ПОЗИЦИЕЙ в строке. 
+							Этот символ ( <span class="quote">&#171;<span class="quote"><span class="emphasis"><em>^</em></span></span>&#187;</span> ) совпадает с началом строки, Замена этого символа на строку <span class="quote">&#171;<span class="quote">XXX</span>&#187;</span> равносильна тому, что перед исходной строкой вставляется <span class="quote">&#171;<span class="quote">XXX</span>&#187;</span>. 
+							Как справедливо сказано в оригинале(который я выше процитировал), сам символ <span class="quote">&#171;<span class="quote"><span class="emphasis"><em>^</em></span></span>&#187;</span> соответствует пустой строке. В этом можно убедится так: поменяем всю строку на содержимое этого символа(здесь я использую обратные ссылки, о них ниже)
+							<pre class="screen">$ echo 'ABCD' | sed -r 's/(^).*/\1/'
+# ответ - пустая строка. Здесь я заменил всю строку на внутренность в скобках (^)</pre>
+							В оригинале есть и такой пример:
+							<pre class="programlisting">/^#include/</pre>
+							это выражение отыщет все строки, которые начинаются на <span class="quote">&#171;<span class="quote">#include</span>&#187;</span>, те строки которые не начинаются на <span class="quote">&#171;<span class="quote">#include</span>&#187;</span> будут проигнорированы, даже если перед <span class="quote">&#171;<span class="quote">#include</span>&#187;</span> стоят только пробелы. Для совместимости, не следует использовать <span class="quote">&#171;<span class="quote"><span class="emphasis"><em>^</em></span></span>&#187;</span> в начале подвыражений, так-как POSIX стандарт трактует этот символ как обычный в данном контексте.
+							<div class="note" title="Замечание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Замечание</h3><p>
+									(drBatty):
+								</p><p>
+									Моя версия(4.0.9), похоже всегда считает этот символ специальным, даже тогда, когда использование его как спецсимвол не имеет смысла (например /.^/ ). Потому, если вы хотите искать именно <span class="quote">&#171;<span class="quote"><span class="emphasis"><em>^</em></span></span>&#187;</span>, в RE его необходимо экранировать. Кроме того, тут почему-то не сказано про "многострочный" режим(модификаторы <code class="option">I</code>, для адресного RE, и <code class="option">m</code> для команды <span class="command"><strong>s</strong></span> (об этом сказано чуть выше)).
+								</p></div></dd><dt><span class="term"> <span class="quote">&#171;<span class="quote"><span class="emphasis"><em>$</em></span></span>&#187;</span> </span></dt><dd>
+							Так-же как <span class="quote">&#171;<span class="quote"><span class="emphasis"><em>^</em></span></span>&#187;</span>, но совпадает с концом строки. Например для поиска пустых строк используйте шаблон /^$/ , под него попадают только строки, в которых ничего нет, даже пробелов.
+						</dd><dt><span class="term">[<span class="emphasis"><em>СПИСОК</em></span>] [^<span class="emphasis"><em>СПИСОК</em></span>]</span></dt><dd><p>
+								Совпадает с единственным символом из <span class="emphasis"><em>СПИСКА</em></span>. Для примера, RE
+								</p><pre class="programlisting">/[aeiou]/</pre><p>
+								совпадает только с одной из маленьких гласных нерусских букв. Список может включать диапазоны символов, например /[0-9]/ совпадает с любой цифрой, возможны и более сложные конструкции, например /[0-9A-Fa-f]/ совпадает с любой шестнадцатеричной цифрой. Если перед СПИСКОМ стоит <span class="quote">&#171;<span class="quote">^</span>&#187;</span>, то СПИСОК инвертируется, он совпадёт с любым символом <span class="emphasis"><em>не</em></span> из этого СПИСКА.
+								</p><div class="tip" title="Подсказка" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Подсказка</h3>
+									Если вы хотите включить в <span class="emphasis"><em>СПИСОК</em></span><span class="quote">&#171;<span class="quote">]</span>&#187;</span>, поместите его в начало списка (после <span class="quote">&#171;<span class="quote">^</span>&#187;</span>, если необходимо), если нужно включить <span class="quote">&#171;<span class="quote">-</span>&#187;</span>, поместите его в начало или в конец списка. Для включения <span class="quote">&#171;<span class="quote">^</span>&#187;</span> поместите его в любое место <span class="emphasis"><em>СПИСКА</em></span>, кроме первой позиции.
+								</div><p>
+								Символы <span class="quote">&#171;<span class="quote">$</span>&#187;</span>, <span class="quote">&#171;<span class="quote">*</span>&#187;</span>, <span class="quote">&#171;<span class="quote">.</span>&#187;</span>, <span class="quote">&#171;<span class="quote">[</span>&#187;</span>, и <span class="quote">&#171;<span class="quote">\</span>&#187;</span> не имеют специального значения внутри <span class="emphasis"><em>СПИСКА</em></span>. Для примера, /[\*]/ совпадает с <span class="quote">&#171;<span class="quote">\</span>&#187;</span> или с <span class="quote">&#171;<span class="quote">*</span>&#187;</span>, потому-что <span class="quote">&#171;<span class="quote">\</span>&#187;</span> не имеет специального значения в этом контексте. А дальше фигня какая-то написана про специальные символьные классы(выше я писал про обычные [<span class="emphasis"><em>СПИСОК</em></span>] и [^<span class="emphasis"><em>СПИСОК</em></span>]), приведу без перевода:
+							</p><p>
+								</p><div class="blockquote"><blockquote class="blockquote">
+									However, strings like `[.ch.]', `[=a=]', and `[:space:]' are special within LIST and represent collating symbols, equivalence classes, and character classes, respectively, and `[' is therefore special within LIST when it is followed by `.', `=', or `:'.  Special escapes like `\n' and `\t' are recognized within LIST; this will change in a future version in `POSIXLY_CORRECT' mode.  *Note Escapes::
+								</blockquote></div><p>
+							</p><p>
+								На самом деле, <span class="quote">&#171;<span class="quote">\n</span>&#187;</span> и <span class="quote">&#171;<span class="quote">\t</span>&#187;</span> внутри списка действительно могут присутствовать (в т.ч. и некоторые другие, например <span class="quote">&#171;<span class="quote">\a</span>&#187;</span>), а что касается спец-классов, то тут как раз тот редкий случай, когда лучше почитать ВАШ man 7 regex, там более подробная и правильная информация. Которая, впрочем может тоже не подойти к ВАШЕЙ реализации sed(особенно, если вы взяли свою sed откуда-то слева) например у меня поддерживаются следующие классы(хотя я не все проверял)
+								</p><pre class="programlisting">alnum       digit       punct
+alpha       graph       space
+blank       lower       upper
+cntrl       print       xdigit</pre><p>
+								На самом деле, я недолюбливаю эти спец-классы: никогда точно не знаешь, какие именно символы данная конкретная реализация считает непечатными, и какие именно символы считаются большими буквами(вопрос совсем не тривиальный, 	если буквы русские). 
+								ИМХО в <span class="emphasis"><em>правильно настроенной системе</em></span> текст в <span class="quote">&#171;<span class="quote">правильной</span>&#187;</span> кодировке будет корректно обрабатываться командой sed. 
+								Однако... Проблема в том, что за кодировки отвечает несколько переменных, и они могут иметь различное значение, потому команда "iconv -f КОДИРОВКА" должна вообще-то преобразовать из какой-то КОДИРОВКИ в родную, которая затем <span class="emphasis"><em>должна</em></span> быть нормально и читаемо вывестись на экран, при этом, я могу с помощью sed скажем заменить все большие русские буквы на малые, и это всё <span class="emphasis"><em>должно быть</em></span> нормально видно... Но... 
+								Я предпочитаю написать просто [а-яА-Я] для поиска любой русской буквы, чем потом удивляться.
+								</p><div class="important" title="Важно" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Важно</h3>
+									...Причём стоит заметить, что выражние /[а-яА-Я]/ совпадает с русскими буквами <span class="emphasis"><em>только</em></span> в кодировке cp1251.
+								</div><p>
+							</p><p>
+								(кстати, не все русские кодировки поддерживают такие диапазоны - к сожалению, в некоторых есть "дыры", т.е. [а-я] включает НЕ ТОЛЬКО русские буквы).
+								<a class="link" href="ch05s02.html#utf-8">См. также</a>.
+							</p><p>
+								</p><div class="note" title="Замечание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Замечание</h3>
+									(drBatty) А вообще в большинстве систем sed вовсе и не включает в себя регулярные выражения - она использует системные, которые обычно имеются в glibc. Тащить за собой RE приходится только в "недосистемах" вроде M$ Windows. Именно по этой причине, тонкости работы RE в sed следует выяснять изучая исходники и мануалы к glibc, а вовсе не к sed. См. например уже упомянутый man regex.
+								</div><p>								
+							</p></dd><dt><span class="term"><span class="emphasis"><em>REGEXP1</em></span>|<span class="emphasis"><em>REGEXP2</em></span></span></dt><dd>
+							Это выражение совпадает с <span class="emphasis"><em>REGEXP1</em></span> или с <span class="emphasis"><em>REGEXP2</em></span>. Исходная строка просматривается слева на право, и совпадением считается самое левое вхождение одного из шаблонов. Например:
+							<pre class="screen">$ echo 'ABCDEF' | sed -r 's/D|C/W/'
+ABWDEF
+$ echo 'ABCDEF' | sed -r 's/C|D/W/'
+ABWDEF</pre>
+							Как видите, оба шаблона ( /C|D/ и /D|C/ ) находят первую встреченную букву (C в данном случае).
+							<div class="note" title="Замечание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Замечание</h3>
+								drBatty: Я не в курсе, почему в оригинале не рассказано о важном частном случае: если найдено совпадение ОБОИХ альтернатив, в этом случае, моя версия принимает совпадение самого "длинного" шаблона, точнее того, который захватил больше символов:
+								<pre class="screen">$ echo 'ABCDEFGH' | sed -r 's/C.+|CDE/W/'
+ABW
+$ echo 'ABCDEFGH' | sed -r 's/CDEF|C.+/W/'
+ABW</pre>
+								Видно, что захватывает символы подвыражение /C.+/
+								<a class="link" href="ch02s02.html#alter">См. также</a></div>
+							Это расширение GNU.
+						</dd><dt><span class="term"><span class="emphasis"><em>REGEXP1</em></span><span class="emphasis"><em>REGEXP2</em></span></span></dt><dd>
+							Совпадает, если совпало объединение (конкатенация) <span class="emphasis"><em>REGEXP1</em></span> и <span class="emphasis"><em>REGEXP2</em></span>.
+						</dd><dt><span class="term">\<span class="emphasis"><em>ЦИФРА</em></span></span></dt><dd>
+							Совпадает с подвыражением с номером <span class="emphasis"><em>ЦИФРА</em></span> считая с левого края шаблона, "Подвыражением" называется любое RE заключённое в (скобки). \<span class="emphasis"><em>ЦИФРА</em></span> 	называется "обратной ссылкой", по той причине, что исходная строка просматривается слева направо и ссылка может указывать только на то, что уже просмотрено (на то что слева) Например:
+							<pre class="screen">$ echo 'ABCDEFGH' | sed -r 's/.*\1.*(C).*/FOUND/'
+sed: -e выражение #1, символ 20: Invalid back reference
+# Ошибка. Обратная ссылка не может указывать на выражение правее её.
+$ echo 'ABCDEFCGH' | sed -r 's/.*(.).*\1.*/FOUND/'
+FOUND
+# Ещё раз, и медленно :-)
+# 1) любое количество любых символов
+# 2) любой одиночный символ
+# 3) любое количество любых символов
+# 4) символ, такой-же, как был найден в пункте 2
+# 5) любое количество любых символов
+# Это очень нужное RE, и оно часто применяется. В данном случае важны пункты
+# 2 и 4 - в пункте 2 находится любой символ, а в пункте 4 находится точно такой-же
+# т.о. это RE совпадает только со строками в которых есть хотя-бы 2 одинаковых
+# символа. Причём не важно, что-это за символы. Кроме того, неважно,что находится
+# до, между, и после этих символов(в данном случае).
+$ echo 'ABCDEFGH' | sed -r 's/.*(.).*\1.*/FOUND/'
+ABCDEFGH
+# В данном случае одинаковых символов нет, поэтому строка не меняется.
+$ echo 'ABcdEFdGcH' | sed -r 's/.*(.).*\1.*/\1/'
+d
+$ echo 'ABcdEFGcHd' | sed -r 's/.*(.).*\1.*/\1/'
+d
+# в отличие от других случаев, обратные ссылки находят не первое, а ПОСЛЕДНЕЕ
+# совпадение. Т.е., если у нас есть(как в этом примере)
+# cd****строка в которой есть и c и d в любом порядке(хвост)****
+# то отыщется именно d.
+# однако, это касается только случая, если в (хвосте) нету других одинаковых пар
+# если они там есть, результат будет иным:
+$ echo 'ABcdEFGccHd' | sed -r 's/.*(.).*\1.*/\1/'
+c
+$ echo 'ABcdEFGttHd' | sed -r 's/.*(.).*\1.*/\1/'
+t</pre><div class="note" title="Замечание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Замечание</h3>
+								(drBatty): Следует учитывать, что обработка обратных ссылок может занять огромное количество времени и оперативной памяти (особенно если строк много и они длинные), связано это с тем, что при использовании обратных ссылок sed запоминает ВСЕ вхождения подвыражения в скобках, на тот случай, если оно опять встретится.
+							</div></dd><dt><span class="term"><span class="emphasis"><em>\n</em></span></span></dt><dd>
+							Совпадает с символом новой строки. Обычно такие символы никогда не встречаются в строках, т.к. sed загружает поток построчно.
+						</dd><dt><span class="term">\<span class="emphasis"><em>СИМВОЛ</em></span></span></dt><dd>
+							Совпадает с <span class="emphasis"><em>СИМВОЛ</em></span>ом, если символ, один из <span class="quote">&#171;<span class="quote">$</span>&#187;</span>, <span class="quote">&#171;<span class="quote">*</span>&#187;</span>, <span class="quote">&#171;<span class="quote">.</span>&#187;</span>, <span class="quote">&#171;<span class="quote">[</span>&#187;</span>, <span class="quote">&#171;<span class="quote">\</span>&#187;</span>, или <span class="quote">&#171;<span class="quote">^</span>&#187;</span>.
+							<div class="note" title="Замечание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Замечание</h3>
+								это соответствует только C-подобным конструкциям. <span class="quote">&#171;<span class="quote">\t</span>&#187;</span> не является переносимой конструкцией, лучше использовать сам символ <span class="quote">&#171;<span class="quote">\t</span>&#187;</span> в ваших выражениях.
+							</div>
+							Note that the regular expression matcher is greedy, i.e., if two or more matches are detected, it selects the longest; if there are two or more selected with the same size, it selects the first in text.
+						</dd></dl></div><p>
+			</p><p>
+				Примеры:
+				</p><pre class="programlisting">/abcdef/</pre><p>
+				Совпадает с `abcdef'.
+				</p><pre class="programlisting">/a*b/</pre><p>
+				Совпадает с нулевым или большим количеством символов <span class="quote">&#171;<span class="quote">a</span>&#187;</span> после которых следует одиночный символ <span class="quote">&#171;<span class="quote">b</span>&#187;</span>.  Для примера, <span class="quote">&#171;<span class="quote">b</span>&#187;</span> или <span class="quote">&#171;<span class="quote">aaaaab</span>&#187;</span>.
+				</p><pre class="programlisting">/a?b/</pre><p>
+				Совпадает с <span class="quote">&#171;<span class="quote">b</span>&#187;</span> или с <span class="quote">&#171;<span class="quote">ab</span>&#187;</span>.
+				</p><div class="note" title="Замечание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Замечание</h3>
+					drBatty: и не с чем иным
+				</div><p>
+				</p><pre class="programlisting">/a+b+/</pre><p>
+				Совпадает с одним(или с большим числом) символов <span class="quote">&#171;<span class="quote">a</span>&#187;</span> после которого идёт один, либо большее число символов <span class="quote">&#171;<span class="quote">b</span>&#187;</span>. <span class="quote">&#171;<span class="quote">ab</span>&#187;</span> это самое короткое совпадение, другие совпадения: <span class="quote">&#171;<span class="quote">aaaab</span>&#187;</span> или <span class="quote">&#171;<span class="quote">abbbbb</span>&#187;</span> или <span class="quote">&#171;<span class="quote">aaaaaabbbbbbb</span>&#187;</span>.
+				</p><pre class="programlisting">/.*/</pre><p>
+				</p><pre class="programlisting">/.+/</pre><p>
+				Оба этих выражения совпадают со всеми символами в строке; первое выражение отличается тем, что оно совпадает в т.ч. и с пустыми строками. Второе выражение совпадает лишь с теми строками, в которых имеется хотя-бы один символ. (см. ограничения sed пункт 1.б)
+				</p><pre class="programlisting">/^main.*\(.*\)/</pre><p>
+				Это ERE совпадает с любой строкой, которая начинается на  <span class="quote">&#171;<span class="quote">main</span>&#187;</span>, после чего содержит любое количество любых символов.
+				</p><div class="note" title="Замечание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Замечание</h3>
+					в т.ч. и не содержит, что противоречит синтаксису Си(примечание drBatty)
+				</div><p>
+				после чего идёт открывающая скобка <span class="quote">&#171;<span class="quote">(</span>&#187;</span>, ещё некоторое количество символов(или без символов), в затем, закрывающая скобка( <span class="quote">&#171;<span class="quote">)</span>&#187;</span> ).
+				</p><pre class="programlisting">/^\#/</pre><p>
+				Совпадает со строками, которые начинаются на <span class="quote">&#171;<span class="quote">#</span>&#187;</span>.
+				</p><pre class="programlisting">/\\$/</pre><p>
+				Это RE совпадает со строками, в конце которых стоит обратный слеш ( <span class="quote">&#171;<span class="quote">\</span>&#187;</span> ). RE содержит два обратных слеша для экранирования.
+				</p><pre class="programlisting">/\$/</pre><p>
+				Это RE совпадает с любой строкой, в которой имеется хотя-бы один символ <span class="quote">&#171;<span class="quote">$</span>&#187;</span>.
+				</p><pre class="programlisting">/[a-zA-Z0-9]/</pre><p>
+				В английской локали, это выражение совпадает с любой буквой, либо с любой цифрой.
+				</p><div class="note" title="Замечание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Замечание</h3>
+					(drBatty): по-русски любая буква или цифра: [a-zA-Z0-9а-яА-ЯёЁ] это выражение действует в большинстве(но не во всех!) кодировках. А точнее - ни в каких не совпадает(кроме cp1251). Правильнее использовать <span class="quote">&#171;<span class="quote">\w</span>&#187;</span>, которое совпадает с любой буквой в текущей кодировке.
+				</div><p>
+				</p><pre class="programlisting">/[^ tab]+/</pre><p>
+				(тут `tab' означает единственный символ табуляции.)  Это выражение совпадает с одним, либо большим числом символов, равных пробелу либо табуляции. Эти символы обычно разделяют слова в предложениях.
+				</p><pre class="programlisting">/^(.*)\n\1$/</pre><p>
+				Это выражение совпадает с любыми двумя одинаковыми строкам, которые разделены символом новой строки.
+				</p><pre class="programlisting">/.{9}A$/</pre><p>
+				Это выражение совпадает с девятью любыми символами, после которых стоит символ `A'.
+				</p><div class="note" title="Замечание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Замечание</h3>
+					(drBatty): это выражение не совпадает с "ыыыыA", по той причине, что перед 'A' стоИт всего 4 символа, а не 9.
+				</div><p>
+				</p><pre class="programlisting">/^.{15}A/</pre><p>
+				Это выражение совпадает с любой строкой, которая длиннее 15и символов, и кроме того, 16м символом должен быть символ 'A'.
+			</p></div><div class="section" title="Как `sed' буферизирует данные?"><div class="titlepage"><div><div><h4 class="title"><a name="id2534990"></a>Как `sed' буферизирует данные?</h4></div></div></div><p>
+				`sed' работает с (двумя? неа!) с одним буфером для данных. Второй буфер зарезервирован в большинстве обычных операций, sed читает входной поток в буфер, обрабатывает его, и выводит результат туда-же. В некоторых случаях sed	выводит результат в stdout, но НИКОГДА не выводит в "буфер2". Буфер2 изначально инициализирован пустой строкой ("\n"). Он используется для сохранения промежуточных результатов между обработкой строк (если кодеру ЭТО надо). Лишь немногие команды ('h', 'H' и 'x') имеют доступ (для модификации) к "буферу2". Впрочем для чтения из "буфера2" так-же немного команд ('x', 'g', и 'G'). В оригинале, буфер2 называется "hold space".
+				</p><div class="note" title="Замечание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Замечание</h3>
+					на самом деле, перед обработкой первой строки в буфере2 вообще ничего нет, в т.ч. и символа \n, этот символ добавляется туда командами, например команда `H' сначала добавит к буферу2 `\n', а уж затем добавит буфер.
+				</div><p>
+			</p></div><div class="blockquote"><blockquote class="blockquote"><p>
+		Вы можете обсудить этот документ на <a class="ulink" href="http://emulek.tk/forum/viewtopic.php?f=19&amp;t=5026" target="_top">форуме</a>. Текст предоставляется по лицензии <a class="ulink" href="http://www.gnu.org/licenses/fdl.html" target="_top">GNU Free Documentation License</a> (<a class="ulink" href="http://forum.lorcode.org/viewtopic.php?f=15&amp;t=30" target="_top">Перевод лицензии GFDL</a>).
+	</p><p>
+		Вы можете пожертвовать небольшую сумму яндекс-денег на счёт <span class="command"><strong>41001666004238</strong></span> для оплаты хостинга, интернета, и прочего. Это конечно добровольно, однако это намного улучшит данный документ (у меня будет больше времени для его улучшения). На самом деле, проект часто находится на грани закрытия, ибо никаких денег никогда не приносил, и приносить не будет. Вы можете мне помочь. Спасибо.
+	</p></blockquote></div></div><div class="navfooter"><hr><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch06.html">Пред.</a> </td><td width="20%" align="center"><a accesskey="u" href="ch06.html">Уровень выше</a></td><td width="40%" align="right"> <a accesskey="n" href="ch06s03.html">След.</a></td></tr><tr><td width="40%" align="left" valign="top">Глава 6. info sed. (русский перевод). </td><td width="20%" align="center"><a accesskey="h" href="index.html">Начало</a></td><td width="40%" align="right" valign="top"> Команды sed</td></tr></table></div></body></html>

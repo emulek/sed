@@ -1,0 +1,173 @@
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"><title>Переименование файлов и каталогов.</title><link rel="stylesheet" href="chs/default.css" type="text/css"><meta name="generator" content="DocBook XSL Stylesheets V1.75.1"><link rel="home" href="index.html" title="Краткий учебник по sed."><link rel="up" href="ch04.html" title="Глава 4. Примеры скриптов."><link rel="prev" href="ch04s13.html" title="Парсинг конфигов."><link rel="next" href="ch04s15.html" title="Создание снимков каталогов для бекапа"></head><body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF"><div class="navheader"><table width="100%" summary="Navigation header"><tr><th colspan="3" align="center">Переименование файлов и каталогов.</th></tr><tr><td width="20%" align="left"><a accesskey="p" href="ch04s13.html">Пред.</a> </td><th width="60%" align="center">Глава 4. Примеры скриптов.</th><td width="20%" align="right"> <a accesskey="n" href="ch04s15.html">След.</a></td></tr></table><hr></div><div class="section" title="Переименование файлов и каталогов."><div class="titlepage"><div><div><h3 class="title"><a name="id2524928"></a>Переименование файлов и каталогов.</h3></div></div></div><div class="section" title="Переименование файлов с помощью команды iconv"><div class="titlepage"><div><div><h4 class="title"><a name="id2524933"></a><a name="ren_iconv"></a>Переименование файлов с помощью команды iconv</h4></div></div></div><p>
+				Часто бывает, что файлы упакованы в архив не в той кодировке.  Сами файлы можно с лёгкостью перекодировать в нормальный (для нас) вид, но что делать с именами?  Вот например я скачал множество интересной документации с сайта <a class="ulink" href="http://wiki.kryukov.biz/" target="_top">http://wiki.kryukov.biz/</a>, однако автор уж очень любит называть файлы по-русски, да ещё со всякими двоеточиями и пробелами (чего делать НЕ следует).  Возможно конечно это и не автор, а его викопедичный движок, но меня это конечно всё равно не радует.
+			</p><p>
+				</p><div class="figure"><a name="id2524973"></a><p class="title"><b>Рисунок 4.13. Каталог с файлами имена которых в UTF-8 при кодировке KOI8-R</b></p><div class="figure-contents"><div><img src="img/snapshot5.png" alt="Каталог с файлами имена которых в UTF-8 при кодировке KOI8-R"></div></div></div><p><br class="figure-break">
+			</p><p>
+				Этот рисунок хотя и похож на <a class="link" href="ch04s12.html#pic2_1">предыдущий случай</a> (напомню, там я не смог восстановить имена, и переименовал файлы по имени их inode), однако довольно сильно отличается: Во первых здесь нет вопросительных знаков, а значит все символы сохранились, и их можно восстановить.  Во вторых тут есть ещё и проценты, про них после.  Выполним:
+				</p><pre class="screen">$ ls | iconv -f utf-8 -c
+Сл%83жебна%8F:SpecialPages
+Сл%83жебна%8F:UserLogin
+Сл%83жебна%8F:WhatLinksHere/
+Создание_кл%8E%87ей_и_%81е%80%82и%84ика%82ов
+Спе%86иал%8Cн%8Bе_п%80ава
+С%81%8Bлки
+С%82анда%80%82н%8Bй_ввод,_в%8Bвод_и_в%8Bвод_о%88ибки
+С%82%80%83к%82%83%80и%80ованн%8Bе_%82ек%81%82ов%8Bе_%84айл%8B
+Тек%81%82ов%8Bе_%80едак%82о%80%8B
+Тип%8B_%84айлов
+Тип%8B_%84айлов%8B%85_%81и%81%82ем
+У%81%82ановка_Cyrus-imapd_в_Slackware_Linux
+У%81%82ановка_Postfix_в_Slackware_Linux
+У%81%82ановка_Postfix_из_и%81%85одн%8B%85_кодов
+У%87а%81%82ник:Artur
+У%87а%81%82ник:Frantony
+У%87а%81%82ник:Svasilie
+Файл:Book-02-1.png
+Файл:Flag_ru.jpg
+Файл:Mail-schema.jpg
+Файл:Postfix_arch.gif
+Файл_group</pre><p>
+				Вот, стало всё более читаемо, но остались некоторые непонятки.  Оказывается, уже в изначальном каталоге некоторые русские символы сменились на код %XX, наверное это произошло при сохранении страницы программой <span class="command"><strong>wget</strong></span>.  
+				Как-бы там не было, мы можем вернуть символы обратно sed-командой <span class="command"><strong>s</strong></span>.
+			</p><p>
+				Другая проблема заключается в том, что не все команды и не всегда принимают такие кривые параметры, например если передать имя из буфера sed прямо в команду, а потом её выполнить, файл просто не будет найден.  Необходимо пойти более прямым путём: я передавал имя прямо <span class="emphasis"><em>внутри</em></span> утилиты find с опцией -exec.  Думаю это самый надёжный путь.
+			</p><p>
+				Сначала найдём все файлы и их inode командой
+				</p><pre class="screen">$ find . ! -path "./ren/*" -printf "%i %p\n"</pre><p>
+				Я решил сделать копию нашего каталога (.) внутри него-же в подкаталоге ./ren/, потому мне потребовалось его исключить.  Затем я просто вывожу в поток кривые имена и inode файлов.
+				</p><div class="tip" title="Подсказка" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Подсказка</h3>
+					Наверное будет быстрее и проще прямо после этого сконвертировать кривые имена засунув в конвейер iconv, однако я сделал это внутри sed.
+				</div><p>
+			</p><p>
+				</p><div class="caution" title="Предостережение" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Предостережение</h3>
+					Следует учесть, что команда find находит не только файлы, но и каталоги, однако, эти каталоги находятся <span class="emphasis"><em>и переименовываются</em></span> раньше, чем содержащиеся в них файлы.  Эти файлы переписываются уже внутрь переименованного каталога.
+				</div><p>
+			</p><p>
+				Далее поток с битыми именами поступает в sed-скрипт:
+				</p><div class="example"><a name="id2525145"></a><p class="title"><b>Пример 4.16. Переименование файлов командой iconv.</b></p><div class="example-contents"><pre class="programlisting">#!/bin/sed -rf
+
+s/.*/echo -e '&amp;' | iconv -f utf-8 -c/e
+
+s/%80/р/g
+s/%81/с/g
+s/%82/т/g
+s/%83/у/g
+s/%84/ф/g
+s/%85/х/g
+s/%86/ц/g
+s/%87/ч/g
+s/%88/ш/g
+s/%89/щ/g
+s/%8A/ъ/ig
+s/%8B/ы/ig
+s/%8C/ь/ig
+s/%8D/э/ig
+s/%8E/ю/ig
+s/%8F/я/ig
+
+s/%90/А/g
+s/%91/Б/g
+s/%92/В/g
+s/%93/Г/g
+s/%94/Д/g
+s/%95/Е/g
+s/%96/Ж/g
+s/%97/З/g
+s/%98/И/g
+s/%99/Й/g
+s/%9A/К/ig
+s/%9B/Л/ig
+s/%9C/М/ig
+s/%9D/Н/ig
+s/%9E/О/ig
+s/%9F/П/ig
+
+s/\\/\\\\/g
+s/'/\\'/g
+
+s|^([0-9]+) \./(.*)|find -inum \1 -exec cp -v -r {} 'ren/\2' \\;|e
+</pre></div></div><p><br class="example-break">
+				</p><div class="note" title="Замечание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Замечание</h3>
+					Кстати, новые файлы ren/* всё равно переносятся в ren/ren/, однако это не слишком мешает (они переносятся все сразу, без переименования).
+				</div><p>
+			</p><p>
+				Кстати, получившиеся копия всё равно не работает, точнее смотреть её можно, но по ссылкам не попрыгать.  Причина в самих ссылках:
+				</p><pre class="programlisting">href="/wiki/%D0%9E%D0%B3%D0%BB%D0%B0%D0%B2%D0%BB%D0%B5%D0%BD%D0%B8%D0%B5"</pre><p>
+				Такие ссылки можно исправить следующим скриптом:
+				</p><pre class="programlisting">#!/bin/sed -rf
+
+s/charset=UTF-8/charset=KOI8-R/
+
+/href="[^"]*%D[01]%[89A-F][0-9A-F][^"]*"/ {
+	s//\n&amp;\n/
+	h
+	s/.*\n([^\n]+)\n.*/\1/
+	s/%D([01])%([89A-F][0-9A-F])/\\xD\1\\x\2/g
+	s/.*/echo -e \x27&amp;\x27/e
+	s|^href="/wiki/|href="|
+	G
+	s/(.*)\n(.*)\n(.*)\n(.*)/\2\1\4|/
+}
+</pre><p>
+				После чего весь файл нужно сконвертировать в KOI8-R.
+				</p><div class="note" title="Замечание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Замечание</h3>
+					Логика работы этого скрипта следующая: конструкция <span class="quote">&#171;<span class="quote">%D0%A4</span>&#187;</span> меняется на <span class="quote">&#171;<span class="quote">\xD0\xA4</span>&#187;</span>. Затем она выводится в буфер командой echo. При этом <span class="quote">&#171;<span class="quote">\xD0\xA4</span>&#187;</span> меняется на 2 байта, которые в кодировке UTF-8 соответствуют русской букве <span class="quote">&#171;<span class="quote">Ф</span>&#187;</span>. Причём данный скрипт работает даже если у вас локаль не UTF, или вообще нерусская. (кстати, если у вас всё-же UTF - то этот скрипт может и не сработать из-за несимволов).
+				</div><p>
+			</p></div><div class="section" title="Переименование каталогов из кодировки KOI8-R в UTF-8 (тоже iconv)."><div class="titlepage"><div><div><h4 class="title"><a name="id2525255"></a>Переименование каталогов из кодировки KOI8-R в UTF-8 (тоже iconv).</h4></div></div></div><p>
+				Свой тестовый комп я перевёл с Slacky 10 на 13ю. Кроме разнообразных красивостей и полезностей вроде HALа, я получил ещё и кодировку UTF-8. Не слишком понятно, зафига она вообще нужна (учитывая, что я уже слишком старый, что-бы учить китайский :-) ), но это всё привело к резкому уменьшению скорости работы с текстами... Впрочем, это всё легко лечится отключением UTF (например можно приравнять $LC_ALL в "C").
+			</p><p>
+				Другая проблема - это то, что старые файлы с русскими именами теперь не читаются:
+				</p><div class="figure"><a name="id2525295"></a><p class="title"><b>Рисунок 4.14. Каталог с файлами в KOI8-R</b></p><div class="figure-contents"><div><img src="img/snapshot18.png" alt="Каталог с файлами в KOI8-R"></div></div></div><p><br class="figure-break">
+				Решить эту проблему не так просто, как решается проблема с кодировкой на внешних носителях.
+				</p><div class="note" title="Замечание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Замечание</h3>
+					например для флешки в VFAT проблема решается так:
+					<pre class="screen">mount -t vfat -o iocharset=utf8,codepage=866 /dev/sda1 /mnt/usb</pre></div><p>
+				Дело в том, что при монтировании EXT3 никакой <span class="emphasis"><em>ошибки</em></span> не происходит - такие имена вполне допустимы для наших ФС.
+			</p><p>
+				Именно по этому файлы приходится <span class="emphasis"><em>переименовывать</em></span>. Я сделал это следующим скриптом (перед его применением выполните export LC_ALL=C, иначе sed не сможет обработать несимволы, которыми являются русские буквы в кодировке KOI8-R). Скрипт запускается так:
+				</p><pre class="screen">find КАТАЛОГ | ren-koi8.sed</pre><p>
+				</p><div class="example"><a name="id2525356"></a><p class="title"><b>Пример 4.17. Переименование файлов командой iconv. (для каталогов и файлов).</b></p><div class="example-contents"><pre class="programlisting">#!/bin/sed -rnf
+
+# export LC_ALL=C
+
+# сохранение оригинального имени файла
+h
+
+# конвертирование в UTF-8
+s/'/'"'"'/g
+s/.*/echo -e '&amp;' | iconv -f koi8-r -t utf-8/ep
+H
+
+# проверка. является-ли файл каталогом?
+g
+s/\n.*//
+s/'/'"'"'/g
+s/.*/test -d '&amp;'; echo $?/e
+/^0$/{
+        # это каталог
+        g
+        s/.*\n//
+        s/'/'"'"'/g
+        s~.*~mkdir -vp 't/&amp;' &gt;/dev/stderr; echo $?~e
+        /^0$/! b error
+        b
+}
+
+# это файл
+
+g
+s/'/'"'"'/g
+s~(.*)\n(.*)~cp -v '\1' 't/\2' &gt;/dev/stderr; echo $?~e
+/^0$/! {
+        :error
+        s/.*/Erorr code &amp;/p
+        q 77
+}</pre></div></div><p><br class="example-break">
+				</p><div class="note" title="Замечание" style="margin-left: 0.5in; margin-right: 0.5in;"><h3 class="title">Замечание</h3>
+					Конечно тут тоже лучше применить команду <span class="command"><strong>ln</strong></span> вместо <span class="command"><strong>cp</strong></span>. Тогда каталоги будут создаваться, но вот файлы копироваться не станут - вместо этого будут созданы жёсткие ссылки. Если вам понравится результат, вы можете удалить старый каталог, и заменить его новым. Это очень полезно для случая недостаточного пространства на разделе диска.
+				</div><p>
+			</p></div><div class="blockquote"><blockquote class="blockquote"><p>
+		Вы можете обсудить этот документ на <a class="ulink" href="http://emulek.tk/forum/viewtopic.php?f=19&amp;t=5026" target="_top">форуме</a>. Текст предоставляется по лицензии <a class="ulink" href="http://www.gnu.org/licenses/fdl.html" target="_top">GNU Free Documentation License</a> (<a class="ulink" href="http://forum.lorcode.org/viewtopic.php?f=15&amp;t=30" target="_top">Перевод лицензии GFDL</a>).
+	</p><p>
+		Вы можете пожертвовать небольшую сумму яндекс-денег на счёт <span class="command"><strong>41001666004238</strong></span> для оплаты хостинга, интернета, и прочего. Это конечно добровольно, однако это намного улучшит данный документ (у меня будет больше времени для его улучшения). На самом деле, проект часто находится на грани закрытия, ибо никаких денег никогда не приносил, и приносить не будет. Вы можете мне помочь. Спасибо.
+	</p></blockquote></div></div><div class="navfooter"><hr><table width="100%" summary="Navigation footer"><tr><td width="40%" align="left"><a accesskey="p" href="ch04s13.html">Пред.</a> </td><td width="20%" align="center"><a accesskey="u" href="ch04.html">Уровень выше</a></td><td width="40%" align="right"> <a accesskey="n" href="ch04s15.html">След.</a></td></tr><tr><td width="40%" align="left" valign="top">Парсинг конфигов. </td><td width="20%" align="center"><a accesskey="h" href="index.html">Начало</a></td><td width="40%" align="right" valign="top"> Создание снимков каталогов для бекапа</td></tr></table></div></body></html>
